@@ -134,7 +134,7 @@ function LoginScreen() {
       <View style={s.webContainer}>
         <View style={s.loginCard}>
           <Image 
-            source={require('./assets/icon.jpg')} 
+            source={require('./assets/icon.png')} 
             style={{ width: 220, height: 220, alignSelf: 'center', marginBottom: 10, resizeMode: 'contain' }} 
           />
           <Text style={s.loginSub}>Rasoi Seva Management</Text>
