@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "BAPS Rajkot Rasoi Seva",
+    "slug": "baps-rajkot-rasoi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "org.baps.rajkotrasoi"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cff74dbd-7d04-4141-921b-4b4e4fc5e6a6"
+      }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}
