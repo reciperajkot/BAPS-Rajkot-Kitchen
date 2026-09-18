@@ -92,12 +92,11 @@ function LoginScreen() {
   const [isInstallable, setIsInstallable] = useState(false);
 
   useEffect(() => {
-    // આ કોડ માત્ર વેબ બ્રાઉઝરમાં જ ચાલશે
     if (Platform.OS === 'web') {
       const handler = (e: any) => {
-        e.preventDefault(); // બ્રાઉઝરનું ડિફોલ્ટ ઇન્સ્ટોલ પોપઅપ આવતું રોકે છે
-        setDeferredPrompt(e); // ઇન્સ્ટોલ ઇવેન્ટને સેવ કરે છે
-        setIsInstallable(true); // આપણું "Install App" બટન બતાવવાનું ચાલુ કરે છે
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setIsInstallable(true);
       };
       window.addEventListener('beforeinstallprompt', handler);
       return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -106,15 +105,14 @@ function LoginScreen() {
 
   async function handleInstallApp() {
     if (deferredPrompt) {
-      deferredPrompt.prompt(); // યુઝરને ઇન્સ્ટોલ કરવાનું પૂછશે
+      deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
-        setIsInstallable(false); // જો યુઝર ઇન્સ્ટોલ કરી લે, તો બટન ગાયબ કરી દેશે
+        setIsInstallable(false);
       }
       setDeferredPrompt(null);
     }
   }
-  // ----------------------------------------------
 
   async function signIn() {
     if (!email.trim() || !password) return Alert.alert('Error', 'યુઝર ID અને પાસવર્ડ નાખો');
@@ -135,24 +133,23 @@ function LoginScreen() {
         <View style={s.loginCard}>
           <Image 
             source={require('./assets/icon.png')} 
-            style={{ width: 220, height: 220, alignSelf: 'center', marginBottom: 10, resizeMode: 'contain' }} 
+            style={{ width: 140, height: 140, alignSelf: 'center', marginBottom: 15, resizeMode: 'contain' }} 
           />
-          <Text style={s.loginSub}>Rasoi Seva Management</Text>
+          <Text style={s.loginTitle}>BAPS RAJKOT KITCHEN</Text>
+          <Text style={s.loginSub}>Rasoi Seva Management System</Text>
           
-          <TextInput value={email} onChangeText={setEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" style={s.input} autoCapitalize="none" />
-          <TextInput value={password} onChangeText={setPassword} placeholder="પાસવર્ડ" style={s.input} secureTextEntry />
+          <TextInput value={email} onChangeText={setEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" placeholderTextColor="#9ca3af" style={s.input} autoCapitalize="none" />
+          <TextInput value={password} onChangeText={setPassword} placeholder="પાસવર્ડ" placeholderTextColor="#9ca3af" style={s.input} secureTextEntry />
           
           <Pressable disabled={submitting} onPress={signIn} style={s.primary}>
-            <Text style={s.primaryText}>{submitting ? 'Logging in…' : 'Login'}</Text>
+            <Text style={s.primaryText}>{submitting ? 'લૉગ ઇન થઈ રહ્યું છે…' : 'Login'}</Text>
           </Pressable>
 
-          {/* જો બ્રાઉઝર PWA સપોર્ટ કરતું હશે અને એપ ઇન્સ્ટોલ નહીં હોય, તો જ આ બટન દેખાશે */}
           {isInstallable && (
-            <Pressable onPress={handleInstallApp} style={[s.primary, {backgroundColor: '#fff', borderWidth: 2, borderColor: '#E06A42', marginTop: 15}]}>
-              <Text style={{color: '#E06A42', fontSize: 16, fontWeight: '800'}}>⬇️ Install App (ઇન્સ્ટોલ કરો)</Text>
+            <Pressable onPress={handleInstallApp} style={[s.primary, {backgroundColor: '#ffffff', borderWidth: 2, borderColor: '#047857', marginTop: 12}]}>
+              <Text style={{color: '#047857', fontSize: 16, fontWeight: '800'}}>⬇️ Install App (એપ ઇન્સ્ટોલ કરો)</Text>
             </Pressable>
           )}
-
         </View>
       </View>
     </SafeAreaView>
@@ -169,7 +166,7 @@ function Dashboard({ profile, session }: { profile: Profile, session: Session })
           <Text style={s.appTitle}>BAPS Rajkot Kitchen</Text>
           <Text style={s.role}>{roleLabel[profile.role]} • {profile.full_name}</Text>
         </View>
-        <Pressable onPress={logout} style={s.logout}><Text style={{fontWeight:'bold', color:'#D8000C'}}>લોગઆઉટ</Text></Pressable>
+        <Pressable onPress={logout} style={s.logout}><Text style={{fontWeight:'bold', color:'#dc2626'}}>લોગઆઉટ</Text></Pressable>
       </View>
       <ScrollView contentContainerStyle={s.webContainer}>
         {profile.role === 'admin' ? <AdminHome session={session} /> : null}
@@ -213,31 +210,31 @@ function AdminHome({ session }: { session: Session }) {
 
   return (
     <View style={s.p18}>
-      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
         <Text style={s.h1}>એડમિન ડેશબોર્ડ</Text>
-        <Pressable onPress={fetchDashboard} style={{padding: 8, backgroundColor: '#eef2f9', borderRadius: 8}}>
-          <Text style={{fontSize: 14, color: '#2A5298', fontWeight: 'bold'}}>{refreshing ? 'Loading...' : '🔄 રિફ્રેશ'}</Text>
+        <Pressable onPress={fetchDashboard} style={{paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#e2e8f0', borderRadius: 8}}>
+          <Text style={{fontSize: 14, color: '#1e293b', fontWeight: 'bold'}}>{refreshing ? 'Loading...' : '🔄 રિફ્રેશ'}</Text>
         </Pressable>
       </View>
       
       <View style={s.grid}>
         <Card title="કુલ બુકિંગ્સ (Lifetime)" icon="📋" value={stats.count.toString()} />
-        <Card title="કુલ રકમ (₹)" icon="💰" value={stats.revenue.toString()} />
+        <Card title="કુલ રકમ (₹)" icon="💰" value={stats.revenue.toLocaleString()} />
       </View>
 
-      <Pressable onPress={() => setActiveTab('today')} style={[s.primary, {backgroundColor: '#2A5298', paddingVertical: 18, marginBottom: 15}]}>
-         <Text style={{color:'#fff', fontWeight:'900', textAlign: 'center', fontSize: 18}}>📅 આજનો સંપૂર્ણ રિપોર્ટ (Today's Report)</Text>
+      <Pressable onPress={() => setActiveTab('today')} style={[s.primary, {backgroundColor: '#047857', paddingVertical: 18, marginBottom: 12}]}>
+         <Text style={{color:'#fff', fontWeight:'900', textAlign: 'center', fontSize: 17}}>📅 આજનો સંપૂર્ણ રિપોર્ટ (Today's Report)</Text>
       </Pressable>
 
-      <Pressable onPress={() => setActiveTab('bookings')} style={[s.primary, {backgroundColor: '#f0f0f0', borderWidth: 2, borderColor:'#E06A42', borderStyle:'dashed', marginBottom: 20, paddingVertical: 18}]}>
-         <Text style={{color:'#E06A42', fontWeight:'900', textAlign: 'center', fontSize: 18}}>📋 બધા બુકિંગ્સ (All Bookings)</Text>
+      <Pressable onPress={() => setActiveTab('bookings')} style={[s.primary, {backgroundColor: '#ffffff', borderWidth: 2, borderColor:'#047857', marginBottom: 20, paddingVertical: 18}]}>
+         <Text style={{color:'#047857', fontWeight:'900', textAlign: 'center', fontSize: 17}}>📋 બધા બુકિંગ્સ (All Bookings)</Text>
       </Pressable>
 
-      <Text style={[s.sectionTitle]}>સિસ્ટમ મેનેજમેન્ટ</Text>
+      <Text style={s.sectionTitle}>સિસ્ટમ મેનેજમેન્ટ</Text>
       <View style={{gap: 12}}>
         <Pressable onPress={() => setActiveTab('menu')} style={s.menuBtn}><Text style={s.menuBtnText}>🍽️ મેનૂ સેટિંગ્સ</Text></Pressable>
         <Pressable onPress={() => setActiveTab('places')} style={s.menuBtn}><Text style={s.menuBtnText}>📍 સ્થળ સેટિંગ્સ</Text></Pressable>
-        <Pressable onPress={() => setActiveTab('users')} style={[s.menuBtn, {backgroundColor: '#5C2A98'}]}><Text style={s.menuBtnText}>👤 યુઝર મેનેજમેન્ટ</Text></Pressable>
+        <Pressable onPress={() => setActiveTab('users')} style={[s.menuBtn, {backgroundColor: '#4f46e5'}]}><Text style={s.menuBtnText}>👤 યુઝર મેનેજમેન્ટ</Text></Pressable>
       </View>
     </View>
   ); 
@@ -346,11 +343,11 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
       
       <View style={{flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 15, gap: isMobile ? 12 : 0}}>
         <View>
-          <Text style={{fontSize: 26, fontWeight: '900', color: '#1F6B4F'}}>આજનો સંપૂર્ણ રિપોર્ટ</Text>
-          <Text style={{color: '#777', fontSize: 10, fontWeight: 'bold'}}>{todayStr}</Text>
+          <Text style={{fontSize: 26, fontWeight: '900', color: '#047857'}}>આજનો સંપૂર્ણ રિપોર્ટ</Text>
+          <Text style={{color: '#64748b', fontSize: 13, fontWeight: 'bold', marginTop: 2}}>{todayStr}</Text>
         </View>
         <View style={{flexDirection: 'row', gap: 8, width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end'}}>
-          <Pressable onPress={handlePrint} style={[s.refreshBtn, {backgroundColor: '#E06A42', paddingHorizontal: 15, flex: isMobile ? 1 : undefined, alignItems: 'center'}, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}>
+          <Pressable onPress={handlePrint} style={[s.refreshBtn, {backgroundColor: '#d97706', paddingHorizontal: 15, flex: isMobile ? 1 : undefined, alignItems: 'center'}, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}>
             <Text style={{fontSize: 14, color: '#fff', fontWeight: 'bold'}}>🖨️ પ્રિન્ટ</Text>
           </Pressable>
           <Pressable onPress={fetchTodayData} style={[s.refreshBtn, {flex: isMobile ? 1 : undefined, alignItems: 'center'}, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}>
@@ -362,25 +359,25 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
       <View style={{flexDirection: Platform.OS === 'web' ? 'row' : 'column', gap: 15}}>
         
         <View style={{flex: Platform.OS === 'web' ? 1 : undefined}}>
-          <View {...(Platform.OS === 'web' ? { className: 'no-print' } : {})} style={{backgroundColor: '#eef2f9', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#2A5298', marginBottom: 10}}>
-             <Text style={{color: '#2A5298', fontWeight: 'bold'}}>આજની કુલ સેવા </Text>
-             <Text style={{fontSize: 28, fontWeight: '900', color: '#1F6B4F'}}>₹ {totalRevenue}</Text>
-             <Text style={{color: '#555', marginTop: 7, fontWeight: 'bold'}}>કુલ મહેમાનો: {totalGuests} લોકો</Text>
+          <View {...(Platform.OS === 'web' ? { className: 'no-print' } : {})} style={{backgroundColor: '#f0fdf4', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', marginBottom: 12}}>
+             <Text style={{color: '#166534', fontWeight: 'bold', fontSize: 13}}>આજની કુલ સેવા કમાણી</Text>
+             <Text style={{fontSize: 30, fontWeight: '900', color: '#047857', marginVertical: 4}}>₹ {totalRevenue.toLocaleString()}</Text>
+             <Text style={{color: '#374151', fontWeight: '600'}}>કુલ મહેમાનો: {totalGuests} લોકો</Text>
           </View>
 
           <View style={{flexDirection: 'row', gap: 10, marginBottom: 15}}>
-            <View style={[s.card, {flex: 1, minHeight: 70, backgroundColor: '#e8f3ed', padding: 10}]}>
-              <Text style={[s.muted, {color: '#1F6B4F', fontSize: 12, fontWeight: 'bold'}]}>ફૂલ પેમેન્ટ</Text>
-              <Text style={{fontSize: 20, fontWeight: '900', color: '#1F6B4F'}}>{fullPayCount} બુકિંગ</Text>
+            <View style={[s.card, {flex: 1, minHeight: 70, backgroundColor: '#f0fdf4', padding: 12}]}>
+              <Text style={{color: '#166534', fontSize: 12, fontWeight: 'bold'}}>ફૂલ પેમેન્ટ</Text>
+              <Text style={{fontSize: 20, fontWeight: '900', color: '#047857', marginTop: 2}}>{fullPayCount} બુકિંગ</Text>
             </View>
-            <View style={[s.card, {flex: 1, minHeight: 70, backgroundColor: '#fffbe6', padding: 10}]}>
-              <Text style={[s.muted, {color: '#d48806', fontSize: 12, fontWeight: 'bold'}]}>પેન્ડિંગ પેમેન્ટ</Text>
-              <Text style={{fontSize: 20, fontWeight: '900', color: '#d48806'}}>{partialPayCount} બુકિંગ</Text>
+            <View style={[s.card, {flex: 1, minHeight: 70, backgroundColor: '#fefce8', padding: 12}]}>
+              <Text style={{color: '#854d0e', fontSize: 12, fontWeight: 'bold'}}>પેન્ડિંગ પેમેન્ટ</Text>
+              <Text style={{fontSize: 20, fontWeight: '900', color: '#a16207', marginTop: 2}}>{partialPayCount} બુકિંગ</Text>
             </View>
           </View>
 
-          <View style={{backgroundColor: '#fff', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#ddd'}}>
-            <Text style={{fontSize: 18, fontWeight: '900', color: '#E06A42', marginBottom: 10}}>👨‍🍳 પ્રોડક્શન (રસોડા) માટેનું લિસ્ટ</Text>
+          <View style={{backgroundColor: '#fff', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0'}}>
+            <Text style={{fontSize: 18, fontWeight: '900', color: '#d97706', marginBottom: 12}}>👨‍🍳 રસોડા (Production) માટેનું લિસ્ટ</Text>
             
             {Object.keys(menuAggregates).length === 0 ? (
               <Text style={s.muted}>આજે કોઈ જમણવાર નથી.</Text>
@@ -396,18 +393,18 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
                   });
 
                   return (
-                    <View key={type} style={{marginBottom: 15, backgroundColor: '#f9f9f9', padding: 10, borderRadius: 8}}>
-                      <Text style={{fontSize: 16, fontWeight: 'bold', color: '#333', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 5, marginBottom: 8}}>
+                    <View key={type} style={{marginBottom: 15, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                      <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>
                         {type} ({mealBreakdown[type] || 0} લોકો)
                       </Text>
                       
                       {subCategories.map(sub => (
                         <View key={sub} style={{marginBottom: 10}}>
-                          <Text style={{fontSize: 14, fontWeight: 'bold', color: '#B22222', marginBottom: 6}}>{sub}</Text>
+                          <Text style={{fontSize: 14, fontWeight: 'bold', color: '#b91c1c', marginBottom: 6}}>{sub}</Text>
                           <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
                             {Object.keys(menuAggregates[type][sub]).map(itemName => (
-                              <View key={itemName} style={{backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: '#eee'}}>
-                                <Text style={{fontSize: 13, color: '#444'}}><Text style={{fontWeight: 'bold', color: '#1F6B4F'}}>{itemName}</Text> ({menuAggregates[type][sub][itemName]} લોકો)</Text>
+                              <View key={itemName} style={{backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                                <Text style={{fontSize: 13, color: '#334155'}}><Text style={{fontWeight: 'bold', color: '#047857'}}>{itemName}</Text> ({menuAggregates[type][sub][itemName]} લોકો)</Text>
                               </View>
                             ))}
                           </View>
@@ -422,9 +419,9 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
         </View>
 
         <View style={{flex: Platform.OS === 'web' ? 2 : undefined}}>
-          <View style={{backgroundColor: '#fff', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#ddd', flex: 1}}>
+          <View style={{backgroundColor: '#fff', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', flex: 1}}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
-              <Text style={{fontSize: 18, fontWeight: '900', color: '#2A5298'}}>🚚 સ્માર્ટ ડિસ્પેચ શિડ્યુલ</Text>
+              <Text style={{fontSize: 18, fontWeight: '900', color: '#1e293b'}}>🚚 સ્માર્ટ ડિસ્પેચ શિડ્યુલ</Text>
               <Text style={s.statusBadgeText}>{dispatchSchedule.length} ઓર્ડર્સ</Text>
             </View>
 
@@ -435,26 +432,26 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
                 {dispatchSchedule.map((ds, idx) => (
                   <View key={idx} style={s.timelineCard}>
                     <View style={s.timeBadge}>
-                      <Text style={{color: '#d48806', fontWeight: 'bold', fontSize: 16}}>⏰ {ds.time}</Text>
+                      <Text style={{color: '#854d0e', fontWeight: 'bold', fontSize: 15}}>⏰ {ds.time}</Text>
                     </View>
                     
                     <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
                       <View style={{flex: 1}}>
-                        <Text style={{fontSize: 18, fontWeight: '900', color: '#333'}}>📍 {ds.placeName}</Text>
-                        <Text style={{fontSize: 15, fontWeight: 'bold', color: '#1F6B4F', marginTop: 4}}>{ds.mainType} • {ds.guestsCount} લોકો</Text>
+                        <Text style={{fontSize: 18, fontWeight: '900', color: '#1e293b'}}>📍 {ds.placeName}</Text>
+                        <Text style={{fontSize: 15, fontWeight: 'bold', color: '#047857', marginTop: 4}}>{ds.mainType} • {ds.guestsCount} લોકો</Text>
                         
-                        <View style={{marginTop: 8, padding: 8, backgroundColor: '#f5f7fa', borderRadius: 6}}>
-                           <Text style={{color: '#555', fontSize: 13}}>🍽️ {ds.items.join(', ')}</Text>
-                           {ds.note ? <Text style={{color: '#D8000C', fontSize: 13, fontWeight: 'bold', marginTop: 4}}>📝 નોંધ: {ds.note}</Text> : null}
+                        <View style={{marginTop: 8, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 6}}>
+                           <Text style={{color: '#334155', fontSize: 13}}>🍽️ {ds.items.join(', ')}</Text>
+                           {ds.note ? <Text style={{color: '#dc2626', fontSize: 13, fontWeight: 'bold', marginTop: 4}}>📝 નોંધ: {ds.note}</Text> : null}
                         </View>
                       </View>
                       
                       <View style={{alignItems: 'flex-end', justifyContent: 'flex-start', paddingLeft: 10}}>
-                        <Text style={{color: '#555', fontWeight: 'bold'}}>યજમાન:</Text>
-                        <Text style={{color: '#333', fontWeight: '900', fontSize: 15}}>{ds.hostName}</Text>
+                        <Text style={{color: '#64748b', fontWeight: 'bold', fontSize: 12}}>યજમાન:</Text>
+                        <Text style={{color: '#1e293b', fontWeight: '900', fontSize: 14}}>{ds.hostName}</Text>
                         {ds.mobile ? (
-                          <Pressable onPress={() => Linking.openURL(`tel:${ds.mobile}`)} style={[{marginTop: 5, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#eef2f9', borderRadius: 8}, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}>
-                            <Text style={{color: '#2A5298', fontWeight: 'bold', fontSize: 12}}>📞 કૉલ</Text>
+                          <Pressable onPress={() => Linking.openURL(`tel:${ds.mobile}`)} style={[{marginTop: 6, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#e0f2fe', borderRadius: 6}, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}>
+                            <Text style={{color: '#0369a1', fontWeight: 'bold', fontSize: 12}}>📞 કૉલ</Text>
                           </Pressable>
                         ) : null}
                       </View>
@@ -553,43 +550,43 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
       {showForm ? (
         <View style={s.formCard}>
           <Text style={s.sectionTitle}>{editingId ? 'યુઝર એડિટ કરો' : 'નવો યુઝર ઉમેરો'}</Text>
-          <TextInput style={s.input} value={name} onChangeText={setName} placeholder="યુઝરનું નામ" />
-          <TextInput style={s.input} value={mobile} onChangeText={setMobile} placeholder="મોબાઈલ નંબર" keyboardType="phone-pad" />
+          <TextInput style={s.input} value={name} onChangeText={setName} placeholder="યુઝરનું નામ" placeholderTextColor="#9ca3af" />
+          <TextInput style={s.input} value={mobile} onChangeText={setMobile} placeholder="મોબાઈલ નંબર" placeholderTextColor="#9ca3af" keyboardType="phone-pad" />
           <Text style={s.label}>રોલ (Role)</Text>
           <Dropdown options={[{label:'Super Admin', value:'admin'}, {label:'Cash Counter', value:'counter'}, {label:'Production', value:'production'}, {label:'Dispatch', value:'dispatch'}]} selectedValue={role} onSelect={setRole} />
-          <Text style={s.label}>કઈ જગ્યાએ ડ્યૂટી છે? (લખી શકાય છે)</Text>
-          <TextInput style={s.input} value={dutyPlace} onChangeText={setDutyPlace} placeholder="દા.ત. મુખ્ય કાઉન્ટર 1" />
+          <Text style={s.label}>કઈ જગ્યાએ ડ્યૂટી છે?</Text>
+          <TextInput style={s.input} value={dutyPlace} onChangeText={setDutyPlace} placeholder="દા.ત. મુખ્ય કાઉન્ટર 1" placeholderTextColor="#9ca3af" />
           <Text style={s.label}>ફોટો URL (મરજિયાત)</Text>
-          <TextInput style={s.input} value={photoUrl} onChangeText={setPhotoUrl} placeholder="https://..." />
+          <TextInput style={s.input} value={photoUrl} onChangeText={setPhotoUrl} placeholder="https://..." placeholderTextColor="#9ca3af" />
           <Text style={[s.sectionTitle, {marginTop: 15}]}>લોગિન માટેની વિગતો</Text>
-          <TextInput style={s.input} value={loginEmail} onChangeText={setLoginEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" autoCapitalize="none" />
-          <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder="લોગિન પાસવર્ડ" />
+          <TextInput style={s.input} value={loginEmail} onChangeText={setLoginEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" placeholderTextColor="#9ca3af" autoCapitalize="none" />
+          <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder="લોગિન પાસવર્ડ" placeholderTextColor="#9ca3af" />
 
           <Pressable onPress={saveUser} style={s.primary}><Text style={s.primaryText}>યુઝર સેવ કરો</Text></Pressable>
           <Pressable onPress={() => {setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
         </View>
       ) : (
-        <Pressable onPress={() => setShowForm(true)} style={[s.primary, {backgroundColor: '#5C2A98'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
+        <Pressable onPress={() => setShowForm(true)} style={[s.primary, {backgroundColor: '#4f46e5'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
       )}
 
       <Text style={[s.sectionTitle, {marginTop: 20}]}>સ્ટાફ લિસ્ટ</Text>
       {users.map(u => (
         <View key={u.id} style={s.listCard}>
           <View style={{flex: 1}}>
-            <Text style={{fontWeight:'bold', fontSize:16}}>{u.full_name || 'No Name'}</Text>
+            <Text style={{fontWeight:'bold', fontSize:16, color: '#1e293b'}}>{u.full_name || 'No Name'}</Text>
             {u.mobile ? (
               <Pressable onPress={() => Linking.openURL(`tel:${u.mobile}`)}>
-                <Text style={{color:'#2A5298', fontSize: 13, fontWeight: 'bold', textDecorationLine: 'underline'}}>📞 {u.mobile} (કૉલ કરો)</Text>
+                <Text style={{color:'#0284c7', fontSize: 13, fontWeight: 'bold', textDecorationLine: 'underline', marginTop: 2}}>📞 {u.mobile} (કૉલ કરો)</Text>
               </Pressable>
             ) : null}
-            <Text style={{color:'#777', fontSize: 13, marginTop: 4}}>યુઝર ID: <Text style={{fontWeight: 'bold', color: '#333'}}>{u.login_email}</Text> • {roleLabel[u.role as Role]} • 📍 {u.duty_place || 'સ્થળ નથી'}</Text>
+            <Text style={{color:'#64748b', fontSize: 13, marginTop: 4}}>યુઝર ID: <Text style={{fontWeight: 'bold', color: '#1e293b'}}>{u.login_email}</Text> • {roleLabel[u.role as Role]} • 📍 {u.duty_place || 'સ્થળ નથી'}</Text>
           </View>
           <View style={{alignItems: 'flex-end', gap: 6}}>
-            <View style={[s.statusBadge, {backgroundColor: u.is_active ? '#E8F3ED' : '#FFE5E5'}]}><Text style={{color: u.is_active ? '#1F6B4F' : '#D8000C', fontWeight:'bold', fontSize: 12}}>{u.is_active ? 'Active' : 'Inactive'}</Text></View>
+            <View style={[s.statusBadge, {backgroundColor: u.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: u.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{u.is_active ? 'Active' : 'Inactive'}</Text></View>
             <View style={{flexDirection: 'row', gap: 5}}>
               <Pressable onPress={() => openEdit(u)} style={s.editBtn}><Text style={s.editBtnText}>✏️</Text></Pressable>
-              <Pressable onPress={() => toggleStatus(u.id, u.is_active)} style={s.editBtn}><Text style={s.editBtnText}>{u.is_active ? 'બંધ કરો' : 'ચાલુ કરો'}</Text></Pressable>
-              <Pressable onPress={() => deleteUser(u.id)} style={[s.editBtn, {backgroundColor: '#FFE5E5'}]}><Text style={{color:'#D8000C'}}>🗑️</Text></Pressable>
+              <Pressable onPress={() => toggleStatus(u.id, u.is_active)} style={s.editBtn}><Text style={s.editBtnText}>{u.is_active ? 'બંધ' : 'ચાલુ'}</Text></Pressable>
+              <Pressable onPress={() => deleteUser(u.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
             </View>
           </View>
         </View>
@@ -688,11 +685,11 @@ function ProductionHome() {
 
       <View style={{flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 20, gap: isMobile ? 15 : 0}}>
         <View>
-          <Text style={{fontSize: 28, fontWeight: '900', color: '#1F6B4F'}}>👨‍🍳 રસોડા વિભાગ (Production)</Text>
-          <Text style={{color: '#777', fontSize: 23, fontWeight: 'bold', marginTop: 4}}>આજનું રસોઈ મેનૂ • {todayStr}</Text>
+          <Text style={{fontSize: 26, fontWeight: '900', color: '#047857'}}>👨‍🍳 રસોડા વિભાગ (Production)</Text>
+          <Text style={{color: '#64748b', fontSize: 16, fontWeight: 'bold', marginTop: 4}}>આજનું રસોઈ મેનૂ • {todayStr}</Text>
         </View>
         <View style={{flexDirection: 'row', gap: 10, width: isMobile ? '100%' : 'auto'}}>
-          <Pressable onPress={handlePrint} style={[s.refreshBtn, {backgroundColor: '#E06A42', paddingHorizontal: 15, flex: isMobile ? 1 : undefined, alignItems: 'center'}]}>
+          <Pressable onPress={handlePrint} style={[s.refreshBtn, {backgroundColor: '#d97706', paddingHorizontal: 15, flex: isMobile ? 1 : undefined, alignItems: 'center'}]}>
             <Text style={{fontSize: 14, color: '#fff', fontWeight: 'bold'}}>🖨️ પ્રિન્ટ લિસ્ટ</Text>
           </Pressable>
           <Pressable onPress={fetchProductionData} style={[s.refreshBtn, {flex: isMobile ? 1 : undefined, alignItems: 'center'}]}><Text style={s.refreshBtnText}>🔄 રિફ્રેશ</Text></Pressable>
@@ -701,7 +698,7 @@ function ProductionHome() {
 
       {Object.keys(menuAggregates).length === 0 ? (
         <View style={[s.formCard, {alignItems: 'center', padding: 40}]}>
-          <Text style={{fontSize: 20, color: '#777', fontWeight: 'bold'}}>આજે રસોડામાં કોઈ જમણવાર નથી.</Text>
+          <Text style={{fontSize: 18, color: '#64748b', fontWeight: 'bold'}}>આજે રસોડામાં કોઈ જમણવાર નથી.</Text>
         </View>
       ) : (
         <View style={{gap: 20}}>
@@ -716,21 +713,21 @@ function ProductionHome() {
 
             return (
               <View key={type} style={s.formCard}>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#1F6B4F', paddingBottom: 10, marginBottom: 15}}>
-                  <Text style={{fontSize: 22, fontWeight: '900', color: '#1F6B4F'}}>{type}</Text>
-                  <View style={{backgroundColor: '#e8f3ed', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15}}>
-                    <Text style={{color: '#1F6B4F', fontWeight: '900', fontSize: 16}}>👥 કુલ: {mealBreakdown[type] || 0} લોકો</Text>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#047857', paddingBottom: 10, marginBottom: 15}}>
+                  <Text style={{fontSize: 22, fontWeight: '900', color: '#047857'}}>{type}</Text>
+                  <View style={{backgroundColor: '#f0fdf4', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, borderWidth: 1, borderColor: '#bbf7d0'}}>
+                    <Text style={{color: '#047857', fontWeight: '900', fontSize: 15}}>👥 કુલ: {mealBreakdown[type] || 0} લોકો</Text>
                   </View>
                 </View>
 
                 {subCategories.map(sub => (
                   <View key={sub} style={{marginBottom: 15}}>
-                    <Text style={{fontSize: 18, fontWeight: 'bold', color: '#B22222', borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 5, marginBottom: 10}}>{sub}</Text>
+                    <Text style={{fontSize: 17, fontWeight: 'bold', color: '#b91c1c', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 6, marginBottom: 10}}>{sub}</Text>
                     <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
                       {Object.keys(menuAggregates[type][sub]).map(itemName => (
-                        <View key={itemName} style={{backgroundColor: '#f5f7fa', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', minWidth: '22%'}}>
-                          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#333'}}>{itemName}</Text>
-                          <Text style={{fontSize: 18, fontWeight: '900', color: '#E06A42', marginTop: 4}}>{menuAggregates[type][sub][itemName]} <Text style={{fontSize: 13, color: '#555'}}>લોકો માટે</Text></Text>
+                        <View key={itemName} style={{backgroundColor: '#f8fafc', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', minWidth: '22%'}}>
+                          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b'}}>{itemName}</Text>
+                          <Text style={{fontSize: 18, fontWeight: '900', color: '#d97706', marginTop: 4}}>{menuAggregates[type][sub][itemName]} <Text style={{fontSize: 13, color: '#64748b'}}>લોકો માટે</Text></Text>
                         </View>
                       ))}
                     </View>
@@ -741,12 +738,12 @@ function ProductionHome() {
           })}
 
           {notesList.length > 0 && (
-            <View style={[s.formCard, {backgroundColor: '#fffbe6', borderColor: '#ffe58f'}]}>
-              <Text style={{fontSize: 20, fontWeight: '900', color: '#d48806', marginBottom: 12}}>📝 રસોડા માટે ખાસ સૂચનાઓ</Text>
+            <View style={[s.formCard, {backgroundColor: '#fefce8', borderColor: '#fde047'}]}>
+              <Text style={{fontSize: 20, fontWeight: '900', color: '#854d0e', marginBottom: 12}}>📝 રસોડા માટે ખાસ સૂચનાઓ</Text>
               {notesList.map((n, idx) => (
-                <View key={idx} style={{padding: 10, backgroundColor: '#fff', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#ffe58f'}}>
-                  <Text style={{fontWeight: 'bold', color: '#2A5298'}}>⏰ {n.time} • 📍 {n.place} • {n.mainType} ({n.guests} લોકો)</Text>
-                  <Text style={{color: '#D8000C', fontWeight: 'bold', fontSize: 15, marginTop: 4}}>⚠️ {n.note}</Text>
+                <View key={idx} style={{padding: 12, backgroundColor: '#fff', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#fef08a'}}>
+                  <Text style={{fontWeight: 'bold', color: '#1e3a8a'}}>⏰ {n.time} • 📍 {n.place} • {n.mainType} ({n.guests} લોકો)</Text>
+                  <Text style={{color: '#dc2626', fontWeight: 'bold', fontSize: 15, marginTop: 4}}>⚠️ {n.note}</Text>
                 </View>
               ))}
             </View>
@@ -814,7 +811,7 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
       
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>{editingId ? 'સ્થળ એડિટ કરો' : 'નવું સ્થળ ઉમેરો'}</Text>
-        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="સ્થળનું નામ (દા.ત. ડાઇનિંગ હોલ)" />
+        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="સ્થળનું નામ (દા.ત. ડાઇનિંગ હોલ)" placeholderTextColor="#9ca3af" />
         <Pressable onPress={savePlace} style={s.primary}><Text style={s.primaryText}>{editingId ? 'ફેરફાર સેવ કરો' : '＋ સ્થળ ઉમેરો'}</Text></Pressable>
         {editingId && <Pressable onPress={()=>{setEditingId(null); setName('');}} style={s.closeButton}><Text>કેન્સલ એડિટિંગ</Text></Pressable>}
       </View>
@@ -823,14 +820,14 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
       {places.map(p => (
         <View key={p.id} style={s.listCard}>
           <View style={{flex: 1}}>
-            <Text style={{fontWeight:'bold', fontSize: 16, color: p.is_active ? '#000' : '#aaa', textDecorationLine: p.is_active ? 'none' : 'line-through'}}>{p.name}</Text>
+            <Text style={{fontWeight:'bold', fontSize: 16, color: p.is_active ? '#1e293b' : '#94a3b8', textDecorationLine: p.is_active ? 'none' : 'line-through'}}>{p.name}</Text>
           </View>
           <View style={{alignItems: 'flex-end', gap: 6}}>
-             <View style={[s.statusBadge, {backgroundColor: p.is_active ? '#E8F3ED' : '#FFE5E5'}]}><Text style={{color: p.is_active ? '#1F6B4F' : '#D8000C', fontWeight:'bold', fontSize: 12}}>{p.is_active ? 'Active' : 'Inactive'}</Text></View>
+             <View style={[s.statusBadge, {backgroundColor: p.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: p.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{p.is_active ? 'Active' : 'Inactive'}</Text></View>
              <View style={{flexDirection: 'row', gap: 5}}>
               <Pressable onPress={() => openEdit(p)} style={s.editBtn}><Text style={s.editBtnText}>✏️</Text></Pressable>
-              <Pressable onPress={() => toggleStatus(p.id, p.is_active)} style={s.editBtn}><Text style={s.editBtnText}>{p.is_active ? 'બંધ કરો' : 'ચાલુ કરો'}</Text></Pressable>
-              <Pressable onPress={() => deletePlace(p.id)} style={[s.editBtn, {backgroundColor: '#FFE5E5'}]}><Text style={{color:'#D8000C'}}>🗑️</Text></Pressable>
+              <Pressable onPress={() => toggleStatus(p.id, p.is_active)} style={s.editBtn}><Text style={s.editBtnText}>{p.is_active ? 'બંધ' : 'ચાલુ'}</Text></Pressable>
+              <Pressable onPress={() => deletePlace(p.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
             </View>
           </View>
         </View>
@@ -909,10 +906,10 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
       <Text style={s.h1}>મેનૂ મેનેજમેન્ટ</Text>
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>{editingId ? 'વાનગી એડિટ કરો' : 'નવી વાનગી ઉમેરો'}</Text>
-        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="વાનગીનું નામ (દા.ત. પૌવા બટેટા)" />
+        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="વાનગીનું નામ (દા.ત. પૌવા બટેટા)" placeholderTextColor="#9ca3af" />
         <Dropdown label="કયા જમણવારમાં ઉમેરવી છે?" options={MAIN_TYPES.map(t => ({label: t, value: t}))} selectedValue={mainType} onSelect={setMainType} />
         <Dropdown label="વાનગીનો પ્રકાર (કેટેગરી)" options={MENU_STRUCTURE[mainType].map(t => ({label: t, value: t}))} selectedValue={subCategory} onSelect={setSubCategory} />
-        <TextInput style={s.input} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="ભાવ (₹)" />
+        <TextInput style={s.input} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="ભાવ (₹)" placeholderTextColor="#9ca3af" />
         <Pressable onPress={saveMenu} style={s.primary}><Text style={s.primaryText}>{editingId ? 'ફેરફાર સેવ કરો' : '＋ વાનગી ઉમેરો'}</Text></Pressable>
         {editingId && <Pressable onPress={()=>{setEditingId(null); setName(''); setPrice('');}} style={s.closeButton}><Text>કેન્સલ એડિટિંગ</Text></Pressable>}
       </View>
@@ -920,8 +917,9 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
       <Text style={[s.h1, {marginTop: 20}]}>તમામ મેનૂ</Text>
       
       <TextInput 
-        style={[s.input, {borderColor: '#1F6B4F', borderWidth: 2}]} 
+        style={[s.input, {borderColor: '#047857', borderWidth: 2}]} 
         placeholder="🔍 અહીં વાનગીનું નામ શોધો..." 
+        placeholderTextColor="#9ca3af"
         value={searchQuery} 
         onChangeText={setSearchQuery} 
       />
@@ -953,15 +951,15 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
                       {itemsInSub.map(m => (
                         <View key={m.id} style={s.listCard}>
                           <View style={{flex:1}}>
-                            <Text style={{fontWeight:'bold', color: m.is_active ? '#000' : '#aaa', textDecorationLine: m.is_active ? 'none' : 'line-through'}}>{m.name}</Text>
-                            <Text style={{color:'#1F6B4F', fontWeight:'bold'}}>₹{m.price}</Text>
+                            <Text style={{fontWeight:'bold', color: m.is_active ? '#1e293b' : '#94a3b8', textDecorationLine: m.is_active ? 'none' : 'line-through'}}>{m.name}</Text>
+                            <Text style={{color:'#047857', fontWeight:'bold', marginTop: 2}}>₹{m.price}</Text>
                           </View>
                           <View style={{alignItems: 'flex-end', gap: 6}}>
-                             <View style={[s.statusBadge, {backgroundColor: m.is_active ? '#E8F3ED' : '#FFE5E5'}]}><Text style={{color: m.is_active ? '#1F6B4F' : '#D8000C', fontWeight:'bold', fontSize: 12}}>{m.is_active ? 'Active' : 'Inactive'}</Text></View>
+                             <View style={[s.statusBadge, {backgroundColor: m.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: m.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{m.is_active ? 'Active' : 'Inactive'}</Text></View>
                              <View style={{flexDirection:'row', gap: 5}}>
                               <Pressable onPress={() => openEdit(m)} style={s.editBtn}><Text>✏️</Text></Pressable>
                               <Pressable onPress={() => toggleStatus(m.id, m.is_active)} style={s.editBtn}><Text style={s.editBtnText}>{m.is_active ? 'બંધ' : 'ચાલુ'}</Text></Pressable>
-                              <Pressable onPress={() => deleteMenu(m.id)} style={[s.editBtn, {backgroundColor: '#FFE5E5'}]}><Text style={{color:'#D8000C'}}>🗑️</Text></Pressable>
+                              <Pressable onPress={() => deleteMenu(m.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
                             </View>
                           </View>
                         </View>
@@ -1116,14 +1114,14 @@ function CounterHome({ session }: { session: Session }) {
       
       <View style={s.grid}>
         <Card title="કુલ બુકિંગ્સ" icon="📋" value={stats.count.toString()} />
-        <Card title="કુલ યજમાનો (Guests)" icon="👥" value={stats.guests.toString()} />
+        <Card title="કુલ યજમાનો (Guests)" icon="👥" value={stats.guests.toLocaleString()} />
       </View>
 
       <Pressable onPress={() => setActiveTab('new_booking')} style={[s.primary, {marginBottom: 20}]}>
         <Text style={s.primaryText}>＋ નવી બુકિંગ બનાવો</Text>
       </Pressable>
       
-      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5}}>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
         <Text style={s.sectionTitle}>આજની તારીખના જમણવાર</Text>
         <Pressable onPress={fetchDashboard} style={s.refreshBtn}>
           <Text style={s.refreshBtnText}>{refreshing ? 'Loading...' : '🔄 રિફ્રેશ'}</Text>
@@ -1136,8 +1134,8 @@ function CounterHome({ session }: { session: Session }) {
         <BookingCard key={b.id} b={b} places={places} isAdmin={false} onEdit={setEditingBooking} onDelete={deleteBooking} />
       ))}
 
-      <Pressable onPress={() => setActiveTab('all_bookings')} style={[s.primary, {backgroundColor: '#f0f0f0', borderWidth: 2, borderColor:'#1F6B4F', borderStyle:'dashed', marginTop: 10}]}>
-        <Text style={{color:'#1F6B4F', fontWeight:'bold', textAlign: 'center'}}>📋 બધા બુકિંગ્સ જુઓ (View All)</Text>
+      <Pressable onPress={() => setActiveTab('all_bookings')} style={[s.primary, {backgroundColor: '#ffffff', borderWidth: 2, borderColor:'#047857', borderStyle:'dashed', marginTop: 12}]}>
+        <Text style={{color:'#047857', fontWeight:'bold', textAlign: 'center', fontSize: 16}}>📋 બધા બુકિંગ્સ જુઓ (View All)</Text>
       </Pressable>
     </View>
   );
@@ -1177,43 +1175,43 @@ function BookingCard({ b, places, isAdmin, onEdit, onDelete }: any) {
 
   return (
     <View style={s.bookingCard}>
-      <View style={{flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 8, marginBottom: 8}}>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 10, marginBottom: 10}}>
         <View style={{flex: 1}}>
-          <Text style={{fontWeight:'900', fontSize: 18, color: '#1F6B4F'}}>{b.name} {b.father} {b.surname}</Text>
+          <Text style={{fontWeight:'900', fontSize: 18, color: '#1e293b'}}>{b.name} {b.father} {b.surname}</Text>
           {b.mobile ? (
-            <Pressable onPress={() => Linking.openURL(`tel:${b.mobile}`)} style={{marginTop: 3}}>
-              <Text style={{color: '#2A5298', fontWeight: 'bold', fontSize: 14, textDecorationLine: 'underline'}}>📞 {b.mobile} (કૉલ કરો)</Text>
+            <Pressable onPress={() => Linking.openURL(`tel:${b.mobile}`)} style={{marginTop: 4}}>
+              <Text style={{color: '#0284c7', fontWeight: 'bold', fontSize: 14, textDecorationLine: 'underline'}}>📞 {b.mobile} (કૉલ કરો)</Text>
             </Pressable>
-          ) : ( <Text style={{color: '#777', fontSize: 14, marginTop: 3}}>📞 નંબર નથી</Text> )}
+          ) : ( <Text style={{color: '#94a3b8', fontSize: 14, marginTop: 4}}>📞 નંબર નથી</Text> )}
         </View>
         <View style={{alignItems: 'flex-end'}}>
           <Text style={s.statusBadgeText}>{b.payment_status}</Text>
-          <Text style={{color: '#777', fontSize: 12, marginTop: 4, fontWeight: 'bold'}}>પહોંચ: {b.receipt_no || '-'}</Text>
+          <Text style={{color: '#64748b', fontSize: 12, marginTop: 6, fontWeight: 'bold'}}>પહોંચ: {b.receipt_no || '-'}</Text>
         </View>
       </View>
 
       {b.meals && b.meals.map((m: any, idx: number) => (
         <View key={idx} style={s.mealBox}>
-          <Text style={{fontWeight: 'bold', color: '#2A5298', fontSize: 14}}>🗓️ {m.date} • ⏰ {m.time}</Text>
-          <Text style={{fontWeight: '700', marginTop: 4, color: '#333'}}>📍 {placeName} • {m.mainType} ({m.guestsCount} લોકો)</Text>
-          <Text style={{color: '#555', fontSize: 13, marginTop: 2}}>🍽️ {getSortedItems(m.items, m.mainType).map((i:any)=>i.name).join(', ')}</Text>
-          {m.note ? <Text style={{color: '#d48806', fontSize: 13, fontWeight: 'bold', marginTop: 4}}>📝 ખાસ નોંધ: {m.note}</Text> : null}
+          <Text style={{fontWeight: 'bold', color: '#1e3a8a', fontSize: 14}}>🗓️ {m.date} • ⏰ {m.time}</Text>
+          <Text style={{fontWeight: '700', marginTop: 4, color: '#334155'}}>📍 {placeName} • {m.mainType} ({m.guestsCount} લોકો)</Text>
+          <Text style={{color: '#64748b', fontSize: 13, marginTop: 2}}>🍽️ {getSortedItems(m.items, m.mainType).map((i:any)=>i.name).join(', ')}</Text>
+          {m.note ? <Text style={{color: '#d97706', fontSize: 13, fontWeight: 'bold', marginTop: 4}}>📝 ખાસ નોંધ: {m.note}</Text> : null}
         </View>
       ))}
 
-      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10}}>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12}}>
         {isAdmin ? (
-          <Text style={{color:'#E06A42', fontWeight:'900', fontSize: 16}}>💰 કુલ: ₹{b.grand_total}</Text>
+          <Text style={{color:'#d97706', fontWeight:'900', fontSize: 17}}>💰 કુલ: ₹{b.grand_total?.toLocaleString()}</Text>
         ) : (
           <View /> 
         )}
         
         <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end'}}>
-          <Pressable onPress={sendWhatsAppMessage} style={[s.editBtn, {backgroundColor: '#E8F3ED', borderColor: '#1F6B4F'}]}>
-             <Text style={{color:'#1F6B4F', fontWeight: 'bold'}}>💬 WhatsApp</Text>
+          <Pressable onPress={sendWhatsAppMessage} style={[s.editBtn, {backgroundColor: '#f0fdf4', borderColor: '#86efac'}]}>
+             <Text style={{color:'#047857', fontWeight: 'bold'}}>💬 WhatsApp</Text>
           </Pressable>
           <Pressable onPress={() => onEdit(b)} style={s.editBtn}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
-          <Pressable onPress={() => onDelete(b.id)} style={[s.editBtn, {backgroundColor: '#FFE5E5', borderColor: '#FFE5E5'}]}><Text style={{color:'#D8000C', fontWeight: 'bold'}}>🗑️ ડિલીટ</Text></Pressable>
+          <Pressable onPress={() => onDelete(b.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626', fontWeight: 'bold'}}>🗑️ ડિલીટ</Text></Pressable>
         </View>
       </View>
     </View>
@@ -1225,14 +1223,14 @@ function Dropdown({ label, options, selectedValue, onSelect, placeholder }: any)
   const [visible, setVisible] = useState(false);
   const selected = options.find((o: any) => o.value === selectedValue);
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 14 }}>
       {label && <Text style={s.label}>{label}</Text>}
-      <Pressable onPress={() => setVisible(true)} style={s.input}><Text style={{ color: selected ? '#000' : '#888', fontSize: 16 }}>{selected ? selected.label : placeholder || 'પસંદ કરો'}</Text></Pressable>
+      <Pressable onPress={() => setVisible(true)} style={s.input}><Text style={{ color: selected ? '#1e293b' : '#9ca3af', fontSize: 16 }}>{selected ? selected.label : placeholder || 'પસંદ કરો'}</Text></Pressable>
       <Modal visible={visible} transparent animationType="slide">
         <View style={s.modalBg}>
           <View style={s.modalContent}>
             <Text style={s.modalTitle}>{label || 'પસંદ કરો'}</Text>
-            <ScrollView>{options.map((o: any) => (<Pressable key={o.value} style={s.modalItem} onPress={() => { onSelect(o.value); setVisible(false); }}><Text style={[s.modalItemText, selectedValue === o.value ? { color: '#1F6B4F', fontWeight: 'bold' } : null]}>{o.label}</Text></Pressable>))}</ScrollView>
+            <ScrollView>{options.map((o: any) => (<Pressable key={o.value} style={s.modalItem} onPress={() => { onSelect(o.value); setVisible(false); }}><Text style={[s.modalItemText, selectedValue === o.value ? { color: '#047857', fontWeight: 'bold' } : null]}>{o.label}</Text></Pressable>))}</ScrollView>
             <Pressable onPress={() => setVisible(false)} style={s.closeButton}><Text style={s.closeText}>બંધ કરો</Text></Pressable>
           </View>
         </View>
@@ -1260,9 +1258,9 @@ function DatePickerModal({ label, selectedDate, onSelect, placeholder }: any) {
   }
 
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 14 }}>
       {label && <Text style={s.label}>{label}</Text>}
-      <Pressable onPress={() => setVisible(true)} style={[s.input, { marginBottom: 0 }]}><Text style={{ color: selectedDate ? '#000' : '#888', fontSize: 16 }}>{selectedDate || placeholder}</Text></Pressable>
+      <Pressable onPress={() => setVisible(true)} style={[s.input, { marginBottom: 0 }]}><Text style={{ color: selectedDate ? '#1e293b' : '#9ca3af', fontSize: 16 }}>{selectedDate || placeholder}</Text></Pressable>
       <Modal visible={visible} transparent animationType="fade">
         <View style={s.modalBg}>
           <View style={[s.modalContent, {alignItems: 'center'}]}>
@@ -1303,9 +1301,9 @@ function AlarmTimePicker({ label, selectedTime, onSelect, placeholder }: any) {
   }
 
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 14 }}>
       {label && <Text style={s.label}>{label}</Text>}
-      <Pressable onPress={() => setVisible(true)} style={[s.input, { marginBottom: 0 }]}><Text style={{ color: selectedTime ? '#000' : '#888', fontSize: 16 }}>{selectedTime || placeholder}</Text></Pressable>
+      <Pressable onPress={() => setVisible(true)} style={[s.input, { marginBottom: 0 }]}><Text style={{ color: selectedTime ? '#1e293b' : '#9ca3af', fontSize: 16 }}>{selectedTime || placeholder}</Text></Pressable>
       <Modal visible={visible} transparent animationType="fade">
         <View style={s.modalBg}>
           <View style={[s.modalContent, {alignItems: 'center'}]}>
@@ -1378,21 +1376,22 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
 
   return (
     <Modal visible={visible} animationType="slide">
-      <SafeAreaView style={{flex:1, backgroundColor:'#F7F4EE'}}>
-        <View style={[s.header, {paddingTop: Platform.OS === 'web' ? 20 : 0}]}><Text style={s.h1}>{initialData ? 'જમણવાર એડિટ કરો' : 'નવો જમણવાર ઉમેરો'}</Text><Pressable onPress={onClose}><Text style={{fontSize:24}}>✕</Text></Pressable></View>
+      <SafeAreaView style={{flex:1, backgroundColor:'#f8fafc'}}>
+        <View style={[s.header, {paddingTop: Platform.OS === 'web' ? 20 : 0}]}><Text style={s.h1}>{initialData ? 'જમણવાર એડિટ કરો' : 'નવો જમણવાર ઉમેરો'}</Text><Pressable onPress={onClose}><Text style={{fontSize:24, color: '#64748b'}}>✕</Text></Pressable></View>
         <ScrollView contentContainerStyle={[s.webContainer, s.p18]}>
           <View style={s.formCard}>
             <DatePickerModal label="તારીખ પસંદ કરો" selectedDate={date} onSelect={setDate} placeholder="તારીખ પસંદ કરવા અહી ક્લિક કરો" />
             <AlarmTimePicker label="જમવાનો સમય" selectedTime={time} onSelect={setTime} placeholder="સમય સેટ કરવા અહી ક્લિક કરો" />
             <Text style={s.label}>આ જમણવાર માટે લોકોની સંખ્યા</Text>
-            <TextInput placeholder="દા.ત. 150" style={s.input} keyboardType="numeric" value={guestsCount} onChangeText={setGuestsCount} />
+            <TextInput placeholder="દા.ત. 150" placeholderTextColor="#9ca3af" style={s.input} keyboardType="numeric" value={guestsCount} onChangeText={setGuestsCount} />
             <Dropdown label="જમવાનો પ્રકાર" options={MAIN_TYPES.map(t => ({label: t, value: t}))} selectedValue={mainType} onSelect={setMainType} />
             
             <Text style={[s.sectionTitle, {marginTop: 15}]}>મેનૂ પસંદગી</Text>
             
             <TextInput 
-              style={[s.input, {borderColor: '#1F6B4F', borderWidth: 2}]} 
+              style={[s.input, {borderColor: '#047857', borderWidth: 2}]} 
               placeholder="🔍 અહીં વાનગીનું નામ શોધો..." 
+              placeholderTextColor="#9ca3af"
               value={searchQuery} 
               onChangeText={setSearchQuery} 
             />
@@ -1424,9 +1423,9 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
             })}
 
             <Text style={[s.label, {marginTop: 10}]}>આ જમણવાર માટે ખાસ નોંધ</Text>
-            <TextInput placeholder="દા.ત. જમવામાં તીખું ઓછું રાખવું..." style={[s.input, {height: 70, textAlignVertical: 'top'}]} multiline value={mealNote} onChangeText={setMealNote} />
+            <TextInput placeholder="દા.ત. જમવામાં તીખું ઓછું રાખવું..." placeholderTextColor="#9ca3af" style={[s.input, {height: 70, textAlignVertical: 'top'}]} multiline value={mealNote} onChangeText={setMealNote} />
 
-            <Pressable onPress={calculatePrice} style={[s.primary, {backgroundColor:'#2A5298', marginTop: 20}]}><Text style={s.primaryText}>મેનૂનો ભાવ ગણો</Text></Pressable>
+            <Pressable onPress={calculatePrice} style={[s.primary, {backgroundColor:'#0284c7', marginTop: 20}]}><Text style={s.primaryText}>મેનૂનો ભાવ ગણો</Text></Pressable>
             {calculatedTotal !== null && <View style={s.autoRateBox}><Text style={s.autoRateLabel}>૧ ડિશનો ફિક્સ ભાવ:</Text><Text style={s.autoRateValue}>₹ {calculatedTotal}</Text></View>}
             <Pressable onPress={handleSave} style={[s.saveBtn, {marginTop: 20}]}><Text style={s.saveBtnText}>{initialData ? 'ફેરફાર સેવ કરો' : 'આ જમણવાર સેવ કરો'}</Text></Pressable>
           </View>
@@ -1538,10 +1537,10 @@ function BookingScreen({ onBack, session, initialData }: { onBack: () => void, s
       
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>1. યજમાનની વિગતો</Text>
-        <TextInput placeholder="નામ" style={s.input} value={name} onChangeText={setName} />
-        <TextInput placeholder="પિતાનું નામ" style={s.input} value={father} onChangeText={setFather} />
-        <TextInput placeholder="અટક" style={s.input} value={surname} onChangeText={setSurname} />
-        <TextInput placeholder="મોબાઇલ નંબર (૧૦ આંકડા)" style={s.input} keyboardType="phone-pad" maxLength={10} value={mobile} onChangeText={setMobile} />
+        <TextInput placeholder="નામ" placeholderTextColor="#9ca3af" style={s.input} value={name} onChangeText={setName} />
+        <TextInput placeholder="પિતાનું નામ" placeholderTextColor="#9ca3af" style={s.input} value={father} onChangeText={setFather} />
+        <TextInput placeholder="અટક" placeholderTextColor="#9ca3af" style={s.input} value={surname} onChangeText={setSurname} />
+        <TextInput placeholder="મોબાઇલ નંબર (૧૦ આંકડા)" placeholderTextColor="#9ca3af" style={s.input} keyboardType="phone-pad" maxLength={10} value={mobile} onChangeText={setMobile} />
         <Dropdown label="સ્થળ" options={places} selectedValue={selectedPlaceId} onSelect={setSelectedPlaceId} placeholder="સ્થળ પસંદ કરો" />
 
         <Text style={[s.sectionTitle, {marginTop: 20}]}>2. જમણવાર અને મેનૂ</Text>
@@ -1549,29 +1548,29 @@ function BookingScreen({ onBack, session, initialData }: { onBack: () => void, s
         {meals.map((meal, index) => (
           <View key={index} style={s.mealBox}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-              <Text style={{fontWeight:'bold', color:'#2A5298', fontSize: 15}}>🗓️ {meal.date} • ⏰ {meal.time}</Text>
-              <Text style={{fontWeight:'bold', color:'#333'}}>({meal.guestsCount} લોકો)</Text>
+              <Text style={{fontWeight:'bold', color:'#1e3a8a', fontSize: 15}}>🗓️ {meal.date} • ⏰ {meal.time}</Text>
+              <Text style={{fontWeight:'bold', color:'#334155'}}>({meal.guestsCount} લોકો)</Text>
             </View>
-            <Text style={{fontWeight:'bold', marginTop: 5}}>{meal.mainType}</Text>
-            <Text style={{color: '#555'}}>{getSortedItems(meal.items, meal.mainType).map((i:any)=>i.name).join(', ')}</Text>
-            {meal.note ? <Text style={{marginTop:8, color:'#d48806', fontWeight:'bold'}}>📝 નોંધ: {meal.note}</Text> : null}
-            <Text style={{marginTop:8, fontWeight:'bold', color:'#1F6B4F', fontSize: 16}}>૧ ડિશનો ભાવ: ₹{meal.ratePerPlate}</Text>
+            <Text style={{fontWeight:'bold', marginTop: 5, color: '#1e293b'}}>{meal.mainType}</Text>
+            <Text style={{color: '#64748b', fontSize: 13, marginTop: 2}}>{getSortedItems(meal.items, meal.mainType).map((i:any)=>i.name).join(', ')}</Text>
+            {meal.note ? <Text style={{marginTop:6, color:'#d97706', fontWeight:'bold'}}>📝 નોંધ: {meal.note}</Text> : null}
+            <Text style={{marginTop:6, fontWeight:'bold', color:'#047857', fontSize: 15}}>૧ ડિશનો ભાવ: ₹{meal.ratePerPlate}</Text>
             
-            <View style={{flexDirection: 'row', gap: 10, marginTop: 15}}>
+            <View style={{flexDirection: 'row', gap: 10, marginTop: 12}}>
               <Pressable onPress={() => { setEditingMealIndex(index); setShowMealBuilder(true); }} style={[s.editBtn, {flex: 1, alignItems: 'center'}]}><Text style={s.editBtnText}>✏️ એડિટ કરો</Text></Pressable>
-              <Pressable onPress={() => deleteMeal(index)} style={[s.editBtn, {backgroundColor: '#FFE5E5', borderColor: '#FFE5E5', flex: 1, alignItems: 'center'}]}><Text style={[s.editBtnText, {color: '#D8000C'}]}>🗑️ કાઢી નાખો</Text></Pressable>
+              <Pressable onPress={() => deleteMeal(index)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5', flex: 1, alignItems: 'center'}]}><Text style={[s.editBtnText, {color: '#dc2626'}]}>🗑️ કાઢી નાખો</Text></Pressable>
             </View>
           </View>
         ))}
         
-        <Pressable onPress={() => { setEditingMealIndex(null); setShowMealBuilder(true); }} style={[s.primary, {backgroundColor:'#f0f0f0', borderWidth: 2, borderColor:'#1F6B4F', borderStyle:'dashed'}]}><Text style={{color:'#1F6B4F', fontWeight:'bold'}}>＋ નવો જમણવાર ઉમેરો</Text></Pressable>
+        <Pressable onPress={() => { setEditingMealIndex(null); setShowMealBuilder(true); }} style={[s.primary, {backgroundColor:'#ffffff', borderWidth: 2, borderColor:'#047857', borderStyle:'dashed'}]}><Text style={{color:'#047857', fontWeight:'bold', fontSize: 16}}>＋ નવો જમણવાર ઉમેરો</Text></Pressable>
 
         <Text style={[s.sectionTitle, {marginTop: 20}]}>3. અન્ય ફંડ અને પેમેન્ટ</Text>
 
         <Dropdown label="ઠાકોરજી સેવા (₹) - (ટોટલમાં ગણાશે)" options={thakorjiOptions} selectedValue={thakorjiSeva} onSelect={setThakorjiSeva} />
         
         <Text style={s.label}>પહોંચ નંબર</Text>
-        <TextInput placeholder="દા.ત. 123/12" style={s.input} value={receiptNo} onChangeText={setReceiptNo} />
+        <TextInput placeholder="દા.ત. 123/12" placeholderTextColor="#9ca3af" style={s.input} value={receiptNo} onChangeText={setReceiptNo} />
 
         <Text style={s.label}>પેમેન્ટ સ્ટેટસ</Text>
         <View style={{flexDirection: 'row', gap: 10, marginBottom: 15}}>
@@ -1593,19 +1592,19 @@ function BookingScreen({ onBack, session, initialData }: { onBack: () => void, s
                 });
                 return (
                   <View key={d} style={{marginBottom: 8, alignItems: 'flex-end'}}>
-                    <Text style={{fontSize: 14, color: '#333', fontWeight: 'bold'}}>{d}:</Text>
-                    {breakdownTexts.map((txt, idx) => <Text key={idx} style={{fontSize: 13, color: '#555'}}>{txt}</Text>)}
-                    <Text style={{fontSize: 13, color: '#2A5298', fontWeight: 'bold', marginTop: 4}}>દિવસની કુલ રકમ: ₹{dayTotal}</Text>
+                    <Text style={{fontSize: 14, color: '#1e293b', fontWeight: 'bold'}}>{d}:</Text>
+                    {breakdownTexts.map((txt, idx) => <Text key={idx} style={{fontSize: 13, color: '#64748b'}}>{txt}</Text>)}
+                    <Text style={{fontSize: 13, color: '#1e3a8a', fontWeight: 'bold', marginTop: 2}}>દિવસની કુલ રકમ: ₹{dayTotal.toLocaleString()}</Text>
                   </View>
                 );
               })}
             </View>
           )}
-          <Text style={s.grandTotal}>ફાઇનલ કુલ રકમ: ₹ {grandTotal}</Text>
+          <Text style={s.grandTotal}>ફાઇનલ કુલ રકમ: ₹ {grandTotal.toLocaleString()}</Text>
 
           {initialData && diffTotal !== 0 && (
-            <Text style={{fontSize: 18, fontWeight: '900', color: diffTotal > 0 ? '#D8000C' : '#1F6B4F', marginTop: 8}}>
-              {diffTotal > 0 ? `વધારાની લેવાની રકમ: ₹${diffTotal}` : `પરત આપવાની રકમ: ₹${Math.abs(diffTotal)}`}
+            <Text style={{fontSize: 17, fontWeight: '900', color: diffTotal > 0 ? '#dc2626' : '#047857', marginTop: 8}}>
+              {diffTotal > 0 ? `વધારાની લેવાની રકમ: ₹${diffTotal.toLocaleString()}` : `પરત આપવાની રકમ: ₹${Math.abs(diffTotal).toLocaleString()}`}
             </Text>
           )}
         </View>
@@ -1620,19 +1619,84 @@ function BookingScreen({ onBack, session, initialData }: { onBack: () => void, s
   );
 }
 
-function DispatchHome() { return <View><Text style={s.h1}>Dispatch</Text></View>; }
+function DispatchHome() { return <View style={s.p18}><Text style={s.h1}>Dispatch Dashboard</Text></View>; }
 function Card({ title, icon, value }: any) { return <View style={s.card}><Text style={s.icon}>{icon}</Text><Text style={s.muted}>{title}</Text><Text style={s.value}>{value}</Text></View>; }
-function LoadingScreen() { return <SafeAreaView style={s.center}><ActivityIndicator size="large" color="#1F6B4F" /><Text style={{marginTop:10}}>Loading...</Text></SafeAreaView>; }
-function SetupScreen() { return <SafeAreaView style={s.center}><Text>Supabase config missing.</Text></SafeAreaView>; }
+function LoadingScreen() { return <SafeAreaView style={s.center}><ActivityIndicator size="large" color="#047857" /><Text style={{marginTop:10, color: '#64748b'}}>Loading...</Text></SafeAreaView>; }
+function SetupScreen() { return <SafeAreaView style={s.center}><Text style={{color: '#dc2626'}}>Supabase config missing.</Text></SafeAreaView>; }
 
 const s = StyleSheet.create({
-  safe:{flex:1,backgroundColor:'#F7F4EE'}, webContainer: { maxWidth: 1200, width: '100%', alignSelf: 'center' }, p18: { padding: 18 }, loginSafe:{flex:1,backgroundColor:'#F7F4EE',justifyContent:'center',padding:20}, center:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:'#F7F4EE'}, loginCard:{backgroundColor:'#fff',borderRadius:24,padding:26,elevation:3}, logo:{fontSize:42,textAlign:'center'}, loginTitle:{fontSize:25,fontWeight:'800',textAlign:'center',marginTop:8}, loginSub:{textAlign:'center',color:'#777',marginBottom:24,marginTop:10}, header:{paddingHorizontal:18,paddingVertical:14,backgroundColor:'#fff',flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderBottomWidth:1,borderBottomColor:'#eee'}, headerText:{flex:1,marginRight:10}, appTitle:{fontSize:18,fontWeight:'800'}, role:{fontSize:12,color:'#777',marginTop:2}, logout:{padding:9,borderRadius:10,backgroundColor:'#FFE5E5'}, h1:{fontSize:26,fontWeight:'800',marginBottom:7}, muted:{color:'#777',lineHeight:20}, grid:{flexDirection:'row',flexWrap:'wrap',gap:10,marginVertical:18}, card:{backgroundColor:'#fff',borderRadius:18,padding:16,width:'47%',minHeight:100,elevation:1}, icon:{fontSize:27}, value:{fontSize:30,fontWeight:'800',marginTop:8}, input:{backgroundColor:'#fff',borderWidth:1,borderColor:'#ddd',borderRadius:12,padding:13,marginBottom:12,fontSize:16}, label:{fontWeight:'700',marginBottom:7, marginTop:5, color: '#333'}, primary:{backgroundColor:'#1F6B4F',padding:15,borderRadius:13,alignItems:'center',marginVertical:8}, disabled:{opacity:0.65}, primaryText:{color:'#fff',fontSize:16,fontWeight:'800'}, backButton:{alignSelf:'flex-start',paddingVertical:6,paddingHorizontal:2,marginBottom:8}, backText:{fontSize:16,fontWeight:'700',color:'#1F6B4F'}, formCard:{backgroundColor:'#fff',borderRadius:18,padding:18,marginTop:16,elevation:1}, sectionTitle:{fontSize:18,fontWeight:'800',marginBottom:16, color: '#1F6B4F'}, menuBtn: { backgroundColor: '#1F6B4F', padding: 18, borderRadius: 14, alignItems: 'center' }, menuBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }, listCard: { flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:15, backgroundColor:'#fff', marginBottom:8, borderRadius:8, borderWidth:1, borderColor:'#eee' }, statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }, editBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fff' }, editBtnText: { fontWeight: 'bold', color: '#555', fontSize: 14 }, modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }, modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 20, margin: 20, maxHeight: '80%' }, modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 }, modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee' }, modalItemText: { fontSize: 16, color: '#333' }, closeButton: { marginTop: 15, padding: 12, backgroundColor: '#eee', borderRadius: 10, alignItems: 'center' }, closeText: { fontWeight: 'bold', color: '#555' }, mainTypeHeader: { fontSize: 20, fontWeight: '900', color: '#1F6B4F', borderBottomWidth: 2, borderBottomColor: '#1F6B4F', paddingBottom: 5, marginBottom: 10 }, subCategoryHeader: { fontSize: 16, fontWeight: 'bold', color: '#2A5298', backgroundColor: '#eef2f9', padding: 8, borderRadius: 6, marginBottom: 8 }, chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 5, marginBottom: 15 }, chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 25, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fff' }, chipSelected: { backgroundColor: '#1F6B4F', borderColor: '#1F6B4F' }, chipText: { fontSize: 15, color: '#555', fontWeight: '600' }, chipTextSelected: { color: '#fff' }, autoRateBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, backgroundColor: '#e8f3ed', borderRadius: 12, borderWidth: 1, borderColor: '#1f6b4f', marginTop: 15 }, autoRateLabel: { fontSize: 16, fontWeight: 'bold', color: '#1f6b4f' }, autoRateValue: { fontSize: 20, fontWeight: '900', color: '#1F6B4F' }, payBtn: { flex: 1, padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', alignItems: 'center' }, payBtnActive: { backgroundColor: '#1F6B4F', borderColor: '#1F6B4F' }, payBtnText: { fontWeight: 'bold', color: '#555' }, payBtnTextActive: { color: '#fff' }, breakdownContainer: { width: '100%', marginVertical: 15, paddingVertical: 15, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#ffe58f' }, breakdownTitle: { fontWeight: 'bold', color: '#d48806', marginBottom: 8, fontSize: 15, alignSelf: 'flex-end' }, totalBox: { backgroundColor: '#fffbe6', padding: 15, borderRadius: 12, marginTop: 15, alignItems: 'flex-end', borderWidth: 1, borderColor: '#ffe58f' }, totalText: { fontSize: 14, color: '#555', marginBottom: 4 }, grandTotal: { fontSize: 24, fontWeight: '900', color: '#d48806' }, saveBtn: { backgroundColor: '#E06A42', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 }, saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' }, arrowBtn: { padding: 10, backgroundColor: '#f0f0f0', borderRadius: 10 }, arrowText: { fontSize: 20, color: '#555' }, timeText: { fontSize: 30, fontWeight: 'bold', marginVertical: 10, width: 50, textAlign: 'center' }, ampmBtn: { backgroundColor: '#1F6B4F', paddingVertical: 15, paddingHorizontal: 20, borderRadius: 12, marginLeft: 10 }, ampmText: { color: '#fff', fontSize: 20, fontWeight: 'bold' }, refreshBtn: { paddingVertical: 8, paddingHorizontal: 15, backgroundColor: '#eef2f9', borderRadius: 8 }, refreshBtnText: { fontSize: 14, color: '#2A5298', fontWeight: 'bold' },
-  bookingCard: { backgroundColor: '#fff', borderRadius: 12, padding: 15, marginBottom: 12, borderWidth: 1, borderColor: '#ddd', elevation: 2 },
-  mealBox: { backgroundColor: '#f5f7fa', padding: 10, borderRadius: 8, marginTop: 8, borderWidth: 1, borderColor: '#eef2f9' },
-  statusBadgeText: { backgroundColor: '#e8f3ed', color: '#1F6B4F', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: 'bold', fontSize: 12, overflow: 'hidden' },
-  timelineCard: { backgroundColor: '#fff', borderRadius: 12, padding: 15, marginBottom: 12, borderWidth: 1, borderColor: '#ddd', borderLeftWidth: 5, borderLeftColor: '#E06A42', elevation: 2 },
-  timeBadge: { backgroundColor: '#fffbe6', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#ffe58f', alignSelf: 'flex-start', marginBottom: 8 },
-  collapsibleHeader: { backgroundColor: '#eef2f9', padding: 12, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  collapsibleHeaderText: { fontSize: 16, fontWeight: 'bold', color: '#2A5298' },
-  collapsibleHeaderIcon: { fontSize: 14, color: '#2A5298', fontWeight: 'bold' }
+  safe:{flex:1,backgroundColor:'#f8fafc'}, 
+  webContainer: { maxWidth: 1200, width: '100%', alignSelf: 'center' }, 
+  p18: { padding: 18 }, 
+  loginSafe:{flex:1,backgroundColor:'#f8fafc',justifyContent:'center',padding:20}, 
+  center:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:'#f8fafc'}, 
+  loginCard:{backgroundColor:'#ffffff',borderRadius:20,padding:30,shadowColor:'#000',shadowOffset:{width:0,height:4},shadowOpacity:0.08,shadowRadius:12,elevation:4, borderWidth: 1, borderColor: '#e2e8f0'}, 
+  loginTitle:{fontSize:24,fontWeight:'900',textAlign:'center',color:'#047857'}, 
+  loginSub:{textAlign:'center',color:'#64748b',marginBottom:24,marginTop:6,fontSize:14, fontWeight: '600'}, 
+  header:{paddingHorizontal:20,paddingVertical:16,backgroundColor:'#ffffff',flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderBottomWidth:1,borderBottomColor:'#e2e8f0', shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.03, elevation:2}, 
+  headerText:{flex:1,marginRight:10}, 
+  appTitle:{fontSize:18,fontWeight:'900',color:'#1e293b'}, 
+  role:{fontSize:13,color:'#64748b',marginTop:2, fontWeight: '600'}, 
+  logout:{paddingVertical:8,paddingHorizontal:12,borderRadius:8,backgroundColor:'#fef2f2', borderWidth: 1, borderColor: '#fca5a5'}, 
+  h1:{fontSize:26,fontWeight:'900',marginBottom:10, color:'#1e293b'}, 
+  muted:{color:'#64748b',lineHeight:20, fontSize: 14}, 
+  grid:{flexDirection:'row',flexWrap:'wrap',gap:12,marginVertical:15}, 
+  card:{backgroundColor:'#ffffff',borderRadius:16,padding:18,width:'48%',minHeight:110,borderWidth:1,borderColor:'#e2e8f0', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.04, shadowRadius:8, elevation:2}, 
+  icon:{fontSize:28}, 
+  value:{fontSize:28,fontWeight:'900',marginTop:6, color: '#1e293b'}, 
+  input:{backgroundColor:'#ffffff',borderWidth:1,borderColor:'#cbd5e1',borderRadius:10,padding:14,marginBottom:14,fontSize:16, color: '#1e293b'}, 
+  label:{fontWeight:'700',marginBottom:6, marginTop:4, color: '#334155', fontSize: 14}, 
+  primary:{backgroundColor:'#047857',padding:16,borderRadius:12,alignItems:'center',marginVertical:6, shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.1, elevation:2}, 
+  primaryText:{color:'#fff',fontSize:16,fontWeight:'800'}, 
+  backButton:{alignSelf:'flex-start',paddingVertical:6,paddingHorizontal:2,marginBottom:10}, 
+  backText:{fontSize:15,fontWeight:'700',color:'#047857'}, 
+  formCard:{backgroundColor:'#ffffff',borderRadius:16,padding:20,marginTop:12,borderWidth:1,borderColor:'#e2e8f0', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.04, elevation:2}, 
+  sectionTitle:{fontSize:18,fontWeight:'900',marginBottom:14, color: '#1e293b'}, 
+  menuBtn: { backgroundColor: '#047857', padding: 18, borderRadius: 12, alignItems: 'center', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.05, elevation:2 }, 
+  menuBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }, 
+  listCard: { flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:16, backgroundColor:'#ffffff', marginBottom:10, borderRadius:12, borderWidth:1, borderColor:'#e2e8f0', shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.02, elevation:1 }, 
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }, 
+  editBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }, 
+  editBtnText: { fontWeight: 'bold', color: '#475569', fontSize: 13 }, 
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }, 
+  modalContent: { backgroundColor: '#ffffff', borderRadius: 20, padding: 22, margin: 20, maxHeight: '80%', borderWidth: 1, borderColor: '#e2e8f0' }, 
+  modalTitle: { fontSize: 18, fontWeight: '900', marginBottom: 15, color: '#1e293b' }, 
+  modalItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }, 
+  modalItemText: { fontSize: 16, color: '#334155' }, 
+  closeButton: { marginTop: 12, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 10, alignItems: 'center' }, 
+  closeText: { fontWeight: 'bold', color: '#475569' }, 
+  mainTypeHeader: { fontSize: 20, fontWeight: '900', color: '#047857', borderBottomWidth: 2, borderBottomColor: '#047857', paddingBottom: 6, marginBottom: 12, marginTop: 10 }, 
+  collapsibleHeader: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }, 
+  collapsibleHeaderText: { fontSize: 16, fontWeight: 'bold', color: '#1e3a8a' }, 
+  collapsibleHeaderIcon: { fontSize: 14, color: '#1e3a8a', fontWeight: 'bold' }, 
+  chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 4, marginBottom: 15 }, 
+  chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 25, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }, 
+  chipSelected: { backgroundColor: '#047857', borderColor: '#047857' }, 
+  chipText: { fontSize: 14, color: '#475569', fontWeight: '600' }, 
+  chipTextSelected: { color: '#ffffff' }, 
+  autoRateBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#f0fdf4', borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', marginTop: 15 }, 
+  autoRateLabel: { fontSize: 16, fontWeight: 'bold', color: '#166534' }, 
+  autoRateValue: { fontSize: 20, fontWeight: '900', color: '#047857' }, 
+  payBtn: { flex: 1, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center', backgroundColor: '#ffffff' }, 
+  payBtnActive: { backgroundColor: '#047857', borderColor: '#047857' }, 
+  payBtnText: { fontWeight: 'bold', color: '#475569' }, 
+  payBtnTextActive: { color: '#ffffff' }, 
+  breakdownContainer: { width: '100%', marginVertical: 12, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#fde047' }, 
+  breakdownTitle: { fontWeight: 'bold', color: '#854d0e', marginBottom: 6, fontSize: 14, alignSelf: 'flex-end' }, 
+  totalBox: { backgroundColor: '#fefce8', padding: 16, borderRadius: 12, marginTop: 15, alignItems: 'flex-end', borderWidth: 1, borderColor: '#fde047' }, 
+  grandTotal: { fontSize: 22, fontWeight: '900', color: '#854d0e' }, 
+  saveBtn: { backgroundColor: '#d97706', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20, shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.1, elevation:2 }, 
+  saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' }, 
+  arrowBtn: { padding: 10, backgroundColor: '#f1f5f9', borderRadius: 10 }, 
+  arrowText: { fontSize: 20, color: '#475569' }, 
+  timeText: { fontSize: 28, fontWeight: 'bold', marginVertical: 10, width: 50, textAlign: 'center', color: '#1e293b' }, 
+  ampmBtn: { backgroundColor: '#047857', paddingVertical: 14, paddingHorizontal: 18, borderRadius: 10, marginLeft: 10 }, 
+  ampmText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }, 
+  refreshBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#f1f5f9', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' }, 
+  refreshBtnText: { fontSize: 14, color: '#1e3a8a', fontWeight: 'bold' },
+  bookingCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.04, elevation:2 },
+  mealBox: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, marginTop: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+  statusBadgeText: { backgroundColor: '#f0fdf4', color: '#047857', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: 'bold', fontSize: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#bbf7d0' },
+  timelineCard: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0', borderLeftWidth: 5, borderLeftColor: '#d97706', shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.02, elevation:1 },
+  timeBadge: { backgroundColor: '#fefce8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#fde047', alignSelf: 'flex-start', marginBottom: 8 },
 });
