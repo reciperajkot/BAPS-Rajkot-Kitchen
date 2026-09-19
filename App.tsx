@@ -4,10 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
 
-type Role = 'admin' | 'counter' | 'production' | 'dispatch';
+type Role = 'admin' | 'counter' | 'production' | 'dispatch' | 'super_admin';
 type Profile = { id: string; full_name: string | null; mobile: string | null; role: Role; is_active: boolean; duty_places?: string[]; photo_url?: string; login_email?: string; login_pass?: string };
 
-const roleLabel: Record<Role, string> = { admin: 'Super Admin', counter: 'Cash Counter', production: 'Production (રસોડું)', dispatch: 'Dispatch' };
+const roleLabel: Record<Role, string> = { admin: 'Admin', super_admin: 'Super Admin', counter: 'Cash Counter', production: 'Production (રસોડું)', dispatch: 'Dispatch' };
 
 const BASE_MAIN_TYPES = ['નાસ્તો', 'મોર્નિંગ સ્નેક', 'લંચ', 'હાઈ ટી', 'ડિનર', 'નાઈટ સ્નેક'];
 const BASE_SUB_TYPES = ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'શાક', 'પનીર પંજાબી', 'વેજ. પંજાબી', 'કઠોળ', 'ભાત', 'દાળ', 'સલાડ', 'છાશ', 'મુખવાસ', 'લિક્વિડ', 'વિશેષ'];
@@ -62,7 +62,7 @@ export default function App() {
       if (!mounted) return;
       setLoading(false);
       if (error || !data || !data.is_active) {
-        Alert.alert('Error', 'Account inactive or missing.');
+        Alert.alert('ભૂલ', 'તમારું એકાઉન્ટ બંધ છે અથવા પ્રોફાઇલ મળતી નથી.');
         await supabase.auth.signOut();
         return;
       }
@@ -118,14 +118,14 @@ function LoginScreen() {
   }
 
   async function signIn() {
-    if (!email.trim() || !password) return Alert.alert('Error', 'યુઝર ID અને પાસવર્ડ નાખો');
+    if (!email.trim() || !password) return Alert.alert('ભૂલ', 'યુઝર ID અને પાસવર્ડ નાખો');
     if (!supabase) return;
     setSubmitting(true);
     const rawInput = email.trim().toLowerCase();
     const loginEmail = rawInput.includes('@') ? rawInput : `${rawInput}@baps.local`;
     const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
     setSubmitting(false);
-    if (error) Alert.alert('Login failed', 'યુઝર ID અથવા પાસવર્ડ ખોટો છે.');
+    if (error) Alert.alert('લૉગિન નિષ્ફળ', 'યુઝર ID અથવા પાસવર્ડ ખોટો છે.');
   }
 
   return (
@@ -167,7 +167,7 @@ function Dashboard({ profile, session }: { profile: Profile, session: Session })
         <Pressable onPress={logout} style={s.logout}><Text style={{fontWeight:'bold', color:'#dc2626'}}>લોગઆઉટ</Text></Pressable>
       </View>
       <ScrollView contentContainerStyle={s.webContainer}>
-        {profile.role === 'admin' ? <AdminHome session={session} profile={profile} /> : null}
+        {(profile.role === 'admin' || profile.role === 'super_admin') ? <AdminHome session={session} profile={profile} /> : null}
         {profile.role === 'counter' ? <CounterHome session={session} profile={profile} /> : null}
         {profile.role === 'production' ? <ProductionHome /> : null}
         {profile.role === 'dispatch' ? <DispatchHome /> : null}
@@ -230,7 +230,7 @@ function AdminHome({ session, profile }: { session: Session, profile: Profile })
         <View style={{gap: 12, marginTop: 10}}>
           <Pressable onPress={() => setActiveTab('menu')} style={s.menuBtn}><Text style={s.menuBtnText}>🍽️ મેનૂ સેટિંગ્સ</Text></Pressable>
           <Pressable onPress={() => setActiveTab('places')} style={s.menuBtn}><Text style={s.menuBtnText}>📍 સ્થળ સેટિંગ્સ</Text></Pressable>
-          <Pressable onPress={() => setActiveTab('users')} style={[s.menuBtn, {backgroundColor: '#4f46e5'}]}><Text style={s.menuBtnText}>👤 યુઝર મેનેજમેન્ટ</Text></Pressable>
+          <Pressable onPress={() => setActiveTab('users')} style={[s.menuBtn, {backgroundColor: '#4f46e5'}]}><Text style={[s.menuBtnText, {color: '#fff'}]}>👤 યુઝર મેનેજમેન્ટ</Text></Pressable>
         </View>
       </View>
     );
@@ -454,7 +454,7 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN MENU SCREEN (DYNAMIC CATS & CATEGORY MANAGER) =================
+// ================= ADMIN MENU SCREEN =================
 function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
   const [mainType, setMainType] = useState('લંચ');
@@ -722,12 +722,13 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN USERS (MULTIPLE PLACES SUPPORT) =================
+// ================= ADMIN USERS (UPDATED EDGE FUNCTION LOGIC) =================
 function AdminUsersScreen({ onBack }: { onBack: () => void }) {
   const [users, setUsers] = useState<any[]>([]); 
   const [places, setPlaces] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false); 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false); // NEW: Saving state
   
   const [name, setName] = useState(''); const [mobile, setMobile] = useState(''); const [role, setRole] = useState<Role>('counter');
   const [selectedDutyPlaces, setSelectedDutyPlaces] = useState<string[]>([]); 
@@ -775,26 +776,76 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
     } 
   }
   
+  // NEW: Updated saveUser Function with Edge Function and Error Handling
   async function saveUser() {
-    if (!name || !loginEmail || (!loginPass && !editingId)) return Alert.alert('Error', 'નામ અને યુઝર ID ફરજિયાત છે.');
-    if (role === 'counter' && selectedDutyPlaces.length === 0) return Alert.alert('Error', 'કેશ કાઉન્ટર માટે ઓછામાં ઓછું એક સ્થળ પસંદ કરવું ફરજિયાત છે.');
+    if (!name || !loginEmail || (!loginPass && !editingId)) return Alert.alert('ભૂલ ❌', 'નામ, યુઝર ID અને પાસવર્ડ ફરજિયાત છે.');
+    if (role === 'counter' && selectedDutyPlaces.length === 0) return Alert.alert('ભૂલ ❌', 'કેશ કાઉન્ટર માટે ઓછામાં ઓછું એક સ્થળ પસંદ કરવું ફરજિયાત છે.');
     if (!supabase) return;
     
+    setSaving(true);
     const authEmail = loginEmail.includes('@') ? loginEmail.toLowerCase() : `${loginEmail.toLowerCase()}@baps.local`;
     const payload: any = { full_name: name, mobile, role, duty_places: selectedDutyPlaces, photo_url: photoUrl, login_email: loginEmail, is_active: true };
-    if (loginPass) payload.login_pass = loginPass;
     
     if (editingId) {
+      if (loginPass) payload.login_pass = loginPass;
       const { error } = await supabase.from('profiles').update(payload).eq('id', editingId);
-      if(error) Alert.alert('Error', error.message);
-      else Alert.alert('Success', 'યુઝરની ડિટેલ અપડેટ થઈ ગઈ!');
+      
+      setSaving(false);
+      
+      if(error) {
+        Alert.alert('ભૂલ ❌', error.message);
+      } else {
+        Alert.alert('સફળતા 🎉', 'યુઝરની ડિટેલ અપડેટ થઈ ગઈ!');
+        setShowForm(false); setEditingId(null); fetchData();
+      }
     } else {
-      const { data, error } = await supabase.auth.signUp({ email: authEmail, password: loginPass });
-      if (error) return Alert.alert('Auth Error', error.message);
-      if (data.user) await supabase.from('profiles').insert([{ id: data.user.id, ...payload }]);
-      Alert.alert('Success', 'નવો યુઝર ઉમેરાઈ ગયો!');
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+
+        if (!token) {
+          setSaving(false);
+          return Alert.alert('સેશન એક્સપાયર ❌', 'તમારું લૉગિન સેશન પૂરું થઈ ગયું છે, કૃપા કરીને ફરીથી લૉગિન કરો.');
+        }
+
+        const response = await fetch('https://ooeecqioprwverlpdjqe.supabase.co/functions/v1/create-auth-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            email: authEmail,
+            password: loginPass,
+            full_name: name,
+            mobile: mobile || "",
+            role: role
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'યુઝર બનાવવામાં ભૂલ આવી');
+        }
+
+        // Update Places and Login ID mapping
+        const { error: updateError } = await supabase.from('profiles').update({
+           duty_places: selectedDutyPlaces,
+           login_email: loginEmail
+        }).eq('id', result.user.id);
+
+        if (updateError) throw updateError;
+
+        setSaving(false);
+        Alert.alert('સફળતા 🎉', 'નવો યુઝર સફળતાપૂર્વક બની ગયો!');
+        setShowForm(false); setEditingId(null); fetchData();
+
+      } catch (err: any) {
+        setSaving(false);
+        Alert.alert('ભૂલ ❌', err.message);
+      }
     }
-    setShowForm(false); setEditingId(null); fetchData();
   }
 
   function togglePlaceSelection(placeId: string) {
@@ -815,7 +866,7 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
           <Text style={s.sectionTitle}>{editingId ? 'યુઝર એડિટ કરો' : 'નવો યુઝર ઉમેરો'}</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder="યુઝરનું નામ" />
           <TextInput style={s.input} value={mobile} onChangeText={setMobile} placeholder="મોબાઈલ નંબર" keyboardType="phone-pad" />
-          <Dropdown label="રોલ (Role)" options={[{label:'Super Admin', value:'admin'}, {label:'Cash Counter', value:'counter'}, {label:'Production (રસોડું)', value:'production'}, {label:'Dispatch', value:'dispatch'}]} selectedValue={role} onSelect={setRole} />
+          <Dropdown label="રોલ (Role)" options={[{label:'Super Admin', value:'super_admin'}, {label:'Admin', value:'admin'}, {label:'Cash Counter', value:'counter'}, {label:'Production (રસોડું)', value:'production'}, {label:'Dispatch', value:'dispatch'}]} selectedValue={role} onSelect={setRole} />
           
           <Text style={s.label}>આ કાઉન્ટર માટે કયા સ્થળ માન્ય છે? (એકથી વધુ સિલેક્ટ કરી શકાય)</Text>
           <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 15, padding: 10, backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0'}}>
@@ -833,8 +884,10 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
           <TextInput style={s.input} value={loginEmail} onChangeText={setLoginEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" autoCapitalize="none" />
           <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder={editingId ? "નવો પાસવર્ડ (બદલવો હોય તો જ લખો)" : "લોગિન પાસવર્ડ"} onSubmitEditing={saveUser} returnKeyType="done" />
 
-          <Pressable onPress={saveUser} style={s.primary}><Text style={s.primaryText}>યુઝર સેવ કરો (Enter)</Text></Pressable>
-          <Pressable onPress={() => {setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
+          <Pressable disabled={saving} onPress={saveUser} style={[s.primary, saving && {opacity: 0.7}]}>
+            <Text style={s.primaryText}>{saving ? 'સેવ થઈ રહ્યું છે...' : 'યુઝર સેવ કરો (Enter)'}</Text>
+          </Pressable>
+          <Pressable disabled={saving} onPress={() => {setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
         </View>
       ) : (
         <Pressable onPress={() => {setEditingId(null); setName(''); setMobile(''); setLoginEmail(''); setLoginPass(''); setSelectedDutyPlaces([]); setShowForm(true);}} style={[s.primary, {backgroundColor: '#4f46e5'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
@@ -1118,7 +1171,7 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
       };
       const res = initialData?.id ? await supabase.from('bookings').update(payload).eq('id', initialData.id).select() : await supabase.from('bookings').insert([payload]).select();
       if (res.error) throw res.error;
-      Alert.alert('સફળતા', `બુકિંગ સેવ થઈ ગયું!`);
+      Alert.alert('સફળતા 🎉', `બુકિંગ સેવ થઈ ગયું!`);
       onBack();
     } catch (err: any) { Alert.alert('Error', err.message); } finally { setSaving(false); }
   }
@@ -1297,7 +1350,7 @@ function ProductionHome() {
   );
 }
 
-// ================= UTILITY COMPONENTS (Complete without truncating) =================
+// ================= UTILITY COMPONENTS =================
 function DispatchHome() { return <View style={s.p18}><Text style={s.h1}>Dispatch Dashboard</Text></View>; }
 function Card({ title, icon, value }: any) { return <View style={s.card}><Text style={s.icon}>{icon}</Text><Text style={s.muted}>{title}</Text><Text style={s.value}>{value}</Text></View>; }
 function LoadingScreen() { return <SafeAreaView style={s.center}><ActivityIndicator size="large" color="#047857" /><Text style={{marginTop:10, color: '#64748b'}}>Loading...</Text></SafeAreaView>; }
@@ -1308,7 +1361,7 @@ function BookingCard({ b, places, isAdmin, onEdit, onDelete }: any) {
   
   function sendWhatsAppMessage() {
     if (!b.mobile || b.mobile.length !== 10) {
-      Alert.alert('ભૂલ', 'WhatsApp મેસેજ મોકલવા માટે 10 આંકડાનો સાચો મોબાઈલ નંબર હોવો જરૂરી છે.');
+      Alert.alert('ભૂલ ❌', 'WhatsApp મેસેજ મોકલવા માટે 10 આંકડાનો સાચો મોબાઈલ નંબર હોવો જરૂરી છે.');
       return;
     }
     
@@ -1329,7 +1382,7 @@ function BookingCard({ b, places, isAdmin, onEdit, onDelete }: any) {
       window.open(url, '_blank');
     } else {
       Linking.openURL(url).catch(() => {
-        Alert.alert('Error', 'WhatsApp ઓપન કરવામાં ભૂલ આવી.');
+        Alert.alert('ભૂલ ❌', 'WhatsApp ઓપન કરવામાં ભૂલ આવી.');
       });
     }
   }
