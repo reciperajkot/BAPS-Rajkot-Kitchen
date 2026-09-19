@@ -776,10 +776,25 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
     } 
   }
   
-  // NEW: Updated saveUser Function with Edge Function and Error Handling
+ // NEW: Updated saveUser Function with Web Alert Fix
   async function saveUser() {
-    if (!name || !loginEmail || (!loginPass && !editingId)) return Alert.alert('ભૂલ ❌', 'નામ, યુઝર ID અને પાસવર્ડ ફરજિયાત છે.');
-    if (role === 'counter' && selectedDutyPlaces.length === 0) return Alert.alert('ભૂલ ❌', 'કેશ કાઉન્ટર માટે ઓછામાં ઓછું એક સ્થળ પસંદ કરવું ફરજિયાત છે.');
+    // વેબ બ્રાઉઝર અને મોબાઈલ બંનેમાં એલર્ટ બતાવવા માટેનું સ્માર્ટ ફંક્શન
+    const showMsg = (title: string, msg: string) => {
+      if (Platform.OS === 'web') {
+        window.alert(title + " \n\n" + msg);
+      } else {
+        Alert.alert(title, msg);
+      }
+    };
+
+    console.log("Save button clicked!"); // ડિબગ માટે
+
+    if (!name || !loginEmail || (!loginPass && !editingId)) {
+        return showMsg('ભૂલ ❌', 'નામ, યુઝર ID અને પાસવર્ડ ફરજિયાત છે.');
+    }
+    if (role === 'counter' && selectedDutyPlaces.length === 0) {
+        return showMsg('ભૂલ ❌', 'કેશ કાઉન્ટર માટે ઓછામાં ઓછું એક સ્થળ પસંદ કરવું ફરજિયાત છે.');
+    }
     if (!supabase) return;
     
     setSaving(true);
@@ -793,9 +808,9 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
       setSaving(false);
       
       if(error) {
-        Alert.alert('ભૂલ ❌', error.message);
+        showMsg('ભૂલ ❌', error.message);
       } else {
-        Alert.alert('સફળતા 🎉', 'યુઝરની ડિટેલ અપડેટ થઈ ગઈ!');
+        showMsg('સફળતા 🎉', 'યુઝરની ડિટેલ અપડેટ થઈ ગઈ!');
         setShowForm(false); setEditingId(null); fetchData();
       }
     } else {
@@ -805,7 +820,7 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
 
         if (!token) {
           setSaving(false);
-          return Alert.alert('સેશન એક્સપાયર ❌', 'તમારું લૉગિન સેશન પૂરું થઈ ગયું છે, કૃપા કરીને ફરીથી લૉગિન કરો.');
+          return showMsg('સેશન એક્સપાયર ❌', 'તમારું લૉગિન સેશન પૂરું થઈ ગયું છે, કૃપા કરીને પેજ રિફ્રેશ કરીને ફરીથી લૉગિન કરો.');
         }
 
         const response = await fetch('https://ooeecqioprwverlpdjqe.supabase.co/functions/v1/create-auth-user', {
@@ -838,12 +853,12 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
         if (updateError) throw updateError;
 
         setSaving(false);
-        Alert.alert('સફળતા 🎉', 'નવો યુઝર સફળતાપૂર્વક બની ગયો!');
+        showMsg('સફળતા 🎉', 'નવો યુઝર સફળતાપૂર્વક બની ગયો!');
         setShowForm(false); setEditingId(null); fetchData();
 
       } catch (err: any) {
         setSaving(false);
-        Alert.alert('ભૂલ ❌', err.message);
+        showMsg('ભૂલ ❌', err.message);
       }
     }
   }
