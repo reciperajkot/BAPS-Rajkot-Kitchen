@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, Platform, Linking, Image, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
@@ -10,14 +10,19 @@ type Profile = { id: string; full_name: string | null; mobile: string | null; ro
 const roleLabel: Record<Role, string> = { admin: 'Super Admin', counter: 'Cash Counter', production: 'Production (રસોડું)', dispatch: 'Dispatch' };
 
 const MENU_STRUCTURE: Record<string, string[]> = {
-  'નાસ્તો': ['મિષ્ટાન્ન', 'ફરસાણ', 'લિક્વિડ', 'વિશેષ'],
-  'મોર્નિંગ સ્નેક': ['મિષ્ટાન્ન', 'ફરસાણ', 'લિક્વિડ', 'વિશેષ'],
+  'નાસ્તો': ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'લિક્વિડ', 'વિશેષ'],
+  'મોર્નિંગ સ્નેક': ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'લિક્વિડ', 'વિશેષ'],
   'લંચ': ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'શાક', 'પનીર પંજાબી', 'વેજ. પંજાબી', 'કઠોળ', 'ભાત', 'દાળ', 'સલાડ', 'છાશ', 'મુખવાસ', 'વિશેષ'],
-  'હાઈ ટી': ['મિષ્ટાન્ન', 'ફરસાણ', 'લિક્વિડ', 'વિશેષ'],
-  'ડિનર': ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'શાક', 'પનીર પંજાબી', 'વેજ. પંજાબી', 'ભાત', 'દાળ', 'સલાડ', 'છાશ', 'મુખવાસ', 'વિશેષ'],
-  'નાઈટ સ્નેક': ['મિષ્ટાન્ન', 'ફરસાણ', 'લિક્વિડ', 'વિશેષ']
+  'હાઈ ટી': ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'લિક્વિડ', 'વિશેષ'],
+  'ડિનર': ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'શાક', 'પનીર પંજાબી', 'વેજ. પંજાબી', 'કઠોળ', 'ભાત', 'દાળ', 'સલાડ', 'છાશ', 'મુખવાસ', 'વિશેષ'],
+  'નાઈટ સ્નેક': ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'લિક્વિડ', 'વિશેષ']
 };
 const MAIN_TYPES = Object.keys(MENU_STRUCTURE);
+
+function getTodayStr() {
+  const today = new Date();
+  return `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getFullYear()}`;
+}
 
 function getSortedItems(items: any[], mainType: string) {
   const order = MENU_STRUCTURE[mainType] || [];
@@ -82,12 +87,14 @@ export default function App() {
   return <Dashboard profile={profile} session={session} />;
 }
 
+// ================= LOGIN SCREEN =================
 function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const passwordRef = useRef<any>(null);
 
-  // --- PWA (Install App) માટેનું સ્માર્ટ લોજિક ---
+  // PWA (Install App) logic
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
@@ -133,13 +140,33 @@ function LoginScreen() {
         <View style={s.loginCard}>
           <Image 
             source={require('./assets/icon.png')} 
-            style={{ width: 140, height: 140, alignSelf: 'center', marginBottom: 15, resizeMode: 'contain' }} 
+            style={{ width: 130, height: 130, alignSelf: 'center', marginBottom: 15, resizeMode: 'contain' }} 
           />
           <Text style={s.loginTitle}>BAPS RAJKOT KITCHEN</Text>
           <Text style={s.loginSub}>Rasoi Seva Management System</Text>
           
-          <TextInput value={email} onChangeText={setEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" placeholderTextColor="#9ca3af" style={s.input} autoCapitalize="none" />
-          <TextInput value={password} onChangeText={setPassword} placeholder="પાસવર્ડ" placeholderTextColor="#9ca3af" style={s.input} secureTextEntry />
+          <TextInput 
+            value={email} 
+            onChangeText={setEmail} 
+            placeholder="યુઝર ID (દા.ત. Rasodu1)" 
+            placeholderTextColor="#9ca3af" 
+            style={s.input} 
+            autoCapitalize="none" 
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+          />
+          
+          <TextInput 
+            ref={passwordRef}
+            value={password} 
+            onChangeText={setPassword} 
+            placeholder="પાસવર્ડ" 
+            placeholderTextColor="#9ca3af" 
+            style={s.input} 
+            secureTextEntry 
+            returnKeyType="go"
+            onSubmitEditing={signIn}
+          />
           
           <Pressable disabled={submitting} onPress={signIn} style={s.primary}>
             <Text style={s.primaryText}>{submitting ? 'લૉગ ઇન થઈ રહ્યું છે…' : 'Login'}</Text>
@@ -182,6 +209,8 @@ function Dashboard({ profile, session }: { profile: Profile, session: Session })
 function AdminHome({ session }: { session: Session }) { 
   const [activeTab, setActiveTab] = useState<'home'|'menu'|'places'|'users'|'bookings'|'today'>('home');
   const [stats, setStats] = useState({ count: 0, revenue: 0 });
+  const [todayGuestsTotal, setTodayGuestsTotal] = useState(0);
+  const [todayGuestsByMeal, setTodayGuestsByMeal] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { if(activeTab === 'home') fetchDashboard(); }, [activeTab]);
@@ -190,10 +219,30 @@ function AdminHome({ session }: { session: Session }) {
     if (!supabase) return;
     setRefreshing(true);
     try {
-      const { data, error } = await supabase.from('bookings').select('grand_total');
+      const { data, error } = await supabase.from('bookings').select('*');
       if (error) throw error;
       if (data) {
-        setStats({ count: data.length, revenue: data.reduce((acc, b) => acc + (b.grand_total || 0), 0) });
+        const todayStr = getTodayStr();
+        let tRevenue = 0;
+        let tGuests = 0;
+        let mealMap: Record<string, number> = {};
+
+        data.forEach(b => {
+          tRevenue += (b.grand_total || 0);
+          if (b.meals) {
+            b.meals.forEach((m: any) => {
+              if (m.date === todayStr) {
+                const g = m.guestsCount || 0;
+                tGuests += g;
+                mealMap[m.mainType] = (mealMap[m.mainType] || 0) + g;
+              }
+            });
+          }
+        });
+
+        setStats({ count: data.length, revenue: tRevenue });
+        setTodayGuestsTotal(tGuests);
+        setTodayGuestsByMeal(mealMap);
       }
     } catch (err: any) {
       Alert.alert('Database Fetch Error', err.message);
@@ -212,14 +261,43 @@ function AdminHome({ session }: { session: Session }) {
     <View style={s.p18}>
       <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
         <Text style={s.h1}>એડમિન ડેશબોર્ડ</Text>
-        <Pressable onPress={fetchDashboard} style={{paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#e2e8f0', borderRadius: 8}}>
-          <Text style={{fontSize: 14, color: '#1e293b', fontWeight: 'bold'}}>{refreshing ? 'Loading...' : '🔄 રિફ્રેશ'}</Text>
+        <Pressable onPress={fetchDashboard} style={s.refreshBtn}>
+          <Text style={s.refreshBtnText}>{refreshing ? 'Loading...' : '🔄 રિફ્રેશ'}</Text>
         </Pressable>
       </View>
       
       <View style={s.grid}>
         <Card title="કુલ બુકિંગ્સ (Lifetime)" icon="📋" value={stats.count.toString()} />
-        <Card title="કુલ રકમ (₹)" icon="💰" value={stats.revenue.toLocaleString()} />
+        <Card title="કુલ રકમ (₹)" icon="💰" value={`₹ ${stats.revenue.toLocaleString()}`} />
+      </View>
+
+      {/* નવું કાર્ડ: આજના કુલ યજમાનો */}
+      <View style={s.todayGuestsCard}>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+            <Text style={{fontSize: 24}}>👥</Text>
+            <Text style={{fontSize: 18, fontWeight: '900', color: '#065f46'}}>આજના કુલ યજમાનો (Today's Guests)</Text>
+          </View>
+          <Text style={{color: '#047857', fontWeight: 'bold', fontSize: 13}}>🗓️ {getTodayStr()}</Text>
+        </View>
+
+        {Object.keys(todayGuestsByMeal).length === 0 ? (
+          <Text style={{color: '#64748b', fontSize: 14, marginTop: 4}}>આજે કોઈ જમણવાર નોંધાયેલ નથી.</Text>
+        ) : (
+          <View style={{marginTop: 6}}>
+            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10}}>
+              {Object.keys(todayGuestsByMeal).map(mType => (
+                <View key={mType} style={s.mealPill}>
+                  <Text style={{fontSize: 13, color: '#334155'}}><Text style={{fontWeight: 'bold', color: '#047857'}}>{mType}:</Text> {todayGuestsByMeal[mType]} લોકો</Text>
+                </View>
+              ))}
+            </View>
+            <View style={{borderTopWidth: 1, borderTopColor: '#a7f3d0', paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+              <Text style={{fontSize: 15, fontWeight: '800', color: '#065f46'}}>આજના કુલ મહેમાનો:</Text>
+              <Text style={{fontSize: 24, fontWeight: '900', color: '#047857'}}>{todayGuestsTotal.toLocaleString()} લોકો</Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <Pressable onPress={() => setActiveTab('today')} style={[s.primary, {backgroundColor: '#047857', paddingVertical: 18, marginBottom: 12}]}>
@@ -254,8 +332,7 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
   const [menuAggregates, setMenuAggregates] = useState<Record<string, Record<string, Record<string, number>>>>({});
   const [dispatchSchedule, setDispatchSchedule] = useState<any[]>([]);
 
-  const today = new Date();
-  const todayStr = `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth()+1).toString().padStart(2, '0')}-${today.getFullYear()}`;
+  const todayStr = getTodayStr();
 
   useEffect(() => { fetchTodayData(); }, []);
 
@@ -320,25 +397,14 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
   }
 
   function handlePrint() {
-    if (Platform.OS === 'web') {
-      window.print();
-    } else {
-      Alert.alert('પ્રિન્ટ', 'પ્રિન્ટ કરવા માટે કૃપા કરીને વેબ બ્રાઉઝરનો ઉપયોગ કરો.');
-    }
+    if (Platform.OS === 'web') window.print();
+    else Alert.alert('પ્રિન્ટ', 'પ્રિન્ટ કરવા માટે કૃપા કરીને વેબ બ્રાઉઝરનો ઉપયોગ કરો.');
   }
 
   if (loading) return <LoadingScreen />;
 
   return (
     <View style={s.p18}>
-      {Platform.OS === 'web' && (
-        <style>{`
-          @media print {
-            .no-print { display: none !important; }
-          }
-        `}</style>
-      )}
-
       <Pressable onPress={onBack} style={[s.backButton, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}><Text style={s.backText}>‹ પાછા ડેશબોર્ડ પર</Text></Pressable>
       
       <View style={{flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 15, gap: isMobile ? 12 : 0}}>
@@ -357,7 +423,6 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
       </View>
 
       <View style={{flexDirection: Platform.OS === 'web' ? 'row' : 'column', gap: 15}}>
-        
         <View style={{flex: Platform.OS === 'web' ? 1 : undefined}}>
           <View {...(Platform.OS === 'web' ? { className: 'no-print' } : {})} style={{backgroundColor: '#f0fdf4', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', marginBottom: 12}}>
              <Text style={{color: '#166534', fontWeight: 'bold', fontSize: 13}}>આજની કુલ સેવા કમાણી</Text>
@@ -383,36 +448,25 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
               <Text style={s.muted}>આજે કોઈ જમણવાર નથી.</Text>
             ) : (
               <ScrollView style={{maxHeight: Platform.OS === 'web' ? 500 : undefined}}>
-                {Object.keys(menuAggregates).map(type => {
-                  const subCategories = Object.keys(menuAggregates[type]).sort((a, b) => {
-                    let idxA = MENU_STRUCTURE[type]?.indexOf(a) ?? -1;
-                    let idxB = MENU_STRUCTURE[type]?.indexOf(b) ?? -1;
-                    if(idxA === -1) idxA = 999;
-                    if(idxB === -1) idxB = 999;
-                    return idxA - idxB;
-                  });
-
-                  return (
-                    <View key={type} style={{marginBottom: 15, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
-                      <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>
-                        {type} ({mealBreakdown[type] || 0} લોકો)
-                      </Text>
-                      
-                      {subCategories.map(sub => (
-                        <View key={sub} style={{marginBottom: 10}}>
-                          <Text style={{fontSize: 14, fontWeight: 'bold', color: '#b91c1c', marginBottom: 6}}>{sub}</Text>
-                          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-                            {Object.keys(menuAggregates[type][sub]).map(itemName => (
-                              <View key={itemName} style={{backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0'}}>
-                                <Text style={{fontSize: 13, color: '#334155'}}><Text style={{fontWeight: 'bold', color: '#047857'}}>{itemName}</Text> ({menuAggregates[type][sub][itemName]} લોકો)</Text>
-                              </View>
-                            ))}
-                          </View>
+                {Object.keys(menuAggregates).map(type => (
+                  <View key={type} style={{marginBottom: 15, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                    <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>
+                      {type} ({mealBreakdown[type] || 0} લોકો)
+                    </Text>
+                    {Object.keys(menuAggregates[type]).map(sub => (
+                      <View key={sub} style={{marginBottom: 10}}>
+                        <Text style={{fontSize: 14, fontWeight: 'bold', color: '#b91c1c', marginBottom: 6}}>{sub}</Text>
+                        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+                          {Object.keys(menuAggregates[type][sub]).map(itemName => (
+                            <View key={itemName} style={{backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                              <Text style={{fontSize: 13, color: '#334155'}}><Text style={{fontWeight: 'bold', color: '#047857'}}>{itemName}</Text> ({menuAggregates[type][sub][itemName]} લોકો)</Text>
+                            </View>
+                          ))}
                         </View>
-                      ))}
-                    </View>
-                  );
-                })}
+                      </View>
+                    ))}
+                  </View>
+                ))}
               </ScrollView>
             )}
           </View>
@@ -434,18 +488,15 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
                     <View style={s.timeBadge}>
                       <Text style={{color: '#854d0e', fontWeight: 'bold', fontSize: 15}}>⏰ {ds.time}</Text>
                     </View>
-                    
                     <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
                       <View style={{flex: 1}}>
                         <Text style={{fontSize: 18, fontWeight: '900', color: '#1e293b'}}>📍 {ds.placeName}</Text>
                         <Text style={{fontSize: 15, fontWeight: 'bold', color: '#047857', marginTop: 4}}>{ds.mainType} • {ds.guestsCount} લોકો</Text>
-                        
                         <View style={{marginTop: 8, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 6}}>
                            <Text style={{color: '#334155', fontSize: 13}}>🍽️ {ds.items.join(', ')}</Text>
                            {ds.note ? <Text style={{color: '#dc2626', fontSize: 13, fontWeight: 'bold', marginTop: 4}}>📝 નોંધ: {ds.note}</Text> : null}
                         </View>
                       </View>
-                      
                       <View style={{alignItems: 'flex-end', justifyContent: 'flex-start', paddingLeft: 10}}>
                         <Text style={{color: '#64748b', fontWeight: 'bold', fontSize: 12}}>યજમાન:</Text>
                         <Text style={{color: '#1e293b', fontWeight: '900', fontSize: 14}}>{ds.hostName}</Text>
@@ -462,7 +513,6 @@ function TodayReportScreen({ onBack, session }: { onBack: () => void, session: S
             )}
           </View>
         </View>
-        
       </View>
     </View>
   );
@@ -560,9 +610,9 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
           <TextInput style={s.input} value={photoUrl} onChangeText={setPhotoUrl} placeholder="https://..." placeholderTextColor="#9ca3af" />
           <Text style={[s.sectionTitle, {marginTop: 15}]}>લોગિન માટેની વિગતો</Text>
           <TextInput style={s.input} value={loginEmail} onChangeText={setLoginEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" placeholderTextColor="#9ca3af" autoCapitalize="none" />
-          <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder="લોગિન પાસવર્ડ" placeholderTextColor="#9ca3af" />
+          <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder="લોગિન પાસવર્ડ" placeholderTextColor="#9ca3af" onSubmitEditing={saveUser} returnKeyType="done" />
 
-          <Pressable onPress={saveUser} style={s.primary}><Text style={s.primaryText}>યુઝર સેવ કરો</Text></Pressable>
+          <Pressable onPress={saveUser} style={s.primary}><Text style={s.primaryText}>યુઝર સેવ કરો (Enter)</Text></Pressable>
           <Pressable onPress={() => {setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
         </View>
       ) : (
@@ -595,7 +645,7 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= PRODUCTION (રસોડું) MODULE - KDS =================
+// ================= PRODUCTION (રસોડું) MODULE =================
 function ProductionHome() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -603,10 +653,11 @@ function ProductionHome() {
   const [loading, setLoading] = useState(true);
   const [menuAggregates, setMenuAggregates] = useState<Record<string, Record<string, Record<string, number>>>>({});
   const [mealBreakdown, setMealBreakdown] = useState<Record<string, number>>({});
+  const [totalGuestsToday, setTotalGuestsToday] = useState(0);
+  const [dispatchSchedule, setDispatchSchedule] = useState<any[]>([]);
   const [notesList, setNotesList] = useState<any[]>([]);
 
-  const today = new Date();
-  const todayStr = `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth()+1).toString().padStart(2, '0')}-${today.getFullYear()}`;
+  const todayStr = getTodayStr();
 
   useEffect(() => { fetchProductionData(); }, []);
 
@@ -621,7 +672,9 @@ function ProductionHome() {
       if (data) {
         let agg: Record<string, Record<string, Record<string, number>>> = {};
         let mBreakdown: Record<string, number> = {};
+        let tSchedule: any[] = [];
         let notes: any[] = [];
+        let tGuests = 0;
 
         data.forEach(b => {
           let placeName = pData?.find((p:any) => p.id === b.place_id)?.name || 'સ્થળ નથી';
@@ -629,6 +682,7 @@ function ProductionHome() {
             b.meals.forEach((m: any) => {
               if (m.date === todayStr) {
                 const gCount = m.guestsCount || 0;
+                tGuests += gCount;
                 
                 if (!mBreakdown[m.mainType]) mBreakdown[m.mainType] = 0;
                 mBreakdown[m.mainType] += gCount;
@@ -639,6 +693,19 @@ function ProductionHome() {
                   if (!agg[m.mainType][sub]) agg[m.mainType][sub] = {};
                   if (!agg[m.mainType][sub][i.name]) agg[m.mainType][sub][i.name] = 0;
                   agg[m.mainType][sub][i.name] += gCount; 
+                });
+
+                tSchedule.push({
+                  bookingId: b.id,
+                  hostName: `${b.name} ${b.surname}`,
+                  mobile: b.mobile,
+                  time: m.time,
+                  timeValue: parseTimeForSort(m.time),
+                  placeName: placeName,
+                  mainType: m.mainType,
+                  guestsCount: gCount,
+                  items: getSortedItems(m.items, m.mainType).map(i=>i.name),
+                  note: m.note
                 });
 
                 if (m.note) {
@@ -655,8 +722,11 @@ function ProductionHome() {
           }
         });
 
+        tSchedule.sort((a, b) => a.timeValue - b.timeValue);
         setMenuAggregates(agg);
         setMealBreakdown(mBreakdown);
+        setTotalGuestsToday(tGuests);
+        setDispatchSchedule(tSchedule);
         setNotesList(notes);
       }
     } catch (err: any) {
@@ -675,18 +745,10 @@ function ProductionHome() {
 
   return (
     <View style={s.p18}>
-      {Platform.OS === 'web' && (
-        <style>{`
-          @media print {
-            .no-print { display: none !important; }
-          }
-        `}</style>
-      )}
-
-      <View style={{flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 20, gap: isMobile ? 15 : 0}}>
+      <View style={{flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 15, gap: isMobile ? 12 : 0}}>
         <View>
-          <Text style={{fontSize: 26, fontWeight: '900', color: '#047857'}}>👨‍🍳 રસોડા વિભાગ (Production)</Text>
-          <Text style={{color: '#64748b', fontSize: 16, fontWeight: 'bold', marginTop: 4}}>આજનું રસોઈ મેનૂ • {todayStr}</Text>
+          <Text style={{fontSize: 26, fontWeight: '900', color: '#047857'}}>👨‍🍳 રસોડા વિભાગ (Production KDS)</Text>
+          <Text style={{color: '#64748b', fontSize: 14, fontWeight: 'bold', marginTop: 2}}>આજનું રસોઈ મેનૂ અને ડિસ્પેચ શિડ્યુલ • {todayStr}</Text>
         </View>
         <View style={{flexDirection: 'row', gap: 10, width: isMobile ? '100%' : 'auto'}}>
           <Pressable onPress={handlePrint} style={[s.refreshBtn, {backgroundColor: '#d97706', paddingHorizontal: 15, flex: isMobile ? 1 : undefined, alignItems: 'center'}]}>
@@ -696,64 +758,118 @@ function ProductionHome() {
         </View>
       </View>
 
-      {Object.keys(menuAggregates).length === 0 ? (
-        <View style={[s.formCard, {alignItems: 'center', padding: 40}]}>
-          <Text style={{fontSize: 18, color: '#64748b', fontWeight: 'bold'}}>આજે રસોડામાં કોઈ જમણવાર નથી.</Text>
+      {/* જમણવાર મુજબના મહેમાનોના કાઉન્ટ બેજ */}
+      <View style={s.todayGuestsCard}>
+        <Text style={{fontSize: 16, fontWeight: '900', color: '#065f46', marginBottom: 10}}>🍽️ આજના જમણવાર મુજબ યજમાનો:</Text>
+        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10}}>
+          {Object.keys(mealBreakdown).length === 0 ? (
+            <Text style={{color: '#64748b'}}>આજે કોઈ જમણવાર નથી.</Text>
+          ) : (
+            Object.keys(mealBreakdown).map(type => (
+              <View key={type} style={[s.mealPill, {backgroundColor: '#fff', borderWidth: 1, borderColor: '#a7f3d0'}]}>
+                <Text style={{fontSize: 14, color: '#1e293b'}}><Text style={{fontWeight: '900', color: '#047857'}}>{type}:</Text> {mealBreakdown[type]} લોકો</Text>
+              </View>
+            ))
+          )}
         </View>
-      ) : (
-        <View style={{gap: 20}}>
-          {Object.keys(menuAggregates).map(type => {
-            const subCategories = Object.keys(menuAggregates[type]).sort((a, b) => {
-              let idxA = MENU_STRUCTURE[type]?.indexOf(a) ?? -1;
-              let idxB = MENU_STRUCTURE[type]?.indexOf(b) ?? -1;
-              if(idxA === -1) idxA = 999;
-              if(idxB === -1) idxB = 999;
-              return idxA - idxB;
-            });
+        <View style={{borderTopWidth: 1, borderTopColor: '#a7f3d0', paddingTop: 8, marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+          <Text style={{fontSize: 14, fontWeight: 'bold', color: '#065f46'}}>કુલ અંદાજિત જમણવાર:</Text>
+          <Text style={{fontSize: 20, fontWeight: '900', color: '#047857'}}>{totalGuestsToday.toLocaleString()} લોકો</Text>
+        </View>
+      </View>
 
-            return (
-              <View key={type} style={s.formCard}>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#047857', paddingBottom: 10, marginBottom: 15}}>
-                  <Text style={{fontSize: 22, fontWeight: '900', color: '#047857'}}>{type}</Text>
-                  <View style={{backgroundColor: '#f0fdf4', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, borderWidth: 1, borderColor: '#bbf7d0'}}>
-                    <Text style={{color: '#047857', fontWeight: '900', fontSize: 15}}>👥 કુલ: {mealBreakdown[type] || 0} લોકો</Text>
-                  </View>
+      {/* સ્માર્ટ ડિસ્પેચ શિડ્યુલ */}
+      <View style={{backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', marginTop: 15, marginBottom: 20}}>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
+          <Text style={{fontSize: 20, fontWeight: '900', color: '#1e293b'}}>🚚 સ્માર્ટ ડિસ્પેચ શિડ્યુલ (રસોઈ જવાનો સમય)</Text>
+          <Text style={s.statusBadgeText}>{dispatchSchedule.length} ઓર્ડર્સ</Text>
+        </View>
+
+        {dispatchSchedule.length === 0 ? (
+          <Text style={s.muted}>આજે કોઈ ડિસ્પેચ ઓર્ડર નથી.</Text>
+        ) : (
+          <View style={{gap: 12}}>
+            {dispatchSchedule.map((ds, idx) => (
+              <View key={idx} style={s.timelineCard}>
+                <View style={s.timeBadge}>
+                  <Text style={{color: '#854d0e', fontWeight: 'bold', fontSize: 15}}>⏰ {ds.time}</Text>
                 </View>
-
-                {subCategories.map(sub => (
-                  <View key={sub} style={{marginBottom: 15}}>
-                    <Text style={{fontSize: 17, fontWeight: 'bold', color: '#b91c1c', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 6, marginBottom: 10}}>{sub}</Text>
-                    <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
-                      {Object.keys(menuAggregates[type][sub]).map(itemName => (
-                        <View key={itemName} style={{backgroundColor: '#f8fafc', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', minWidth: '22%'}}>
-                          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b'}}>{itemName}</Text>
-                          <Text style={{fontSize: 18, fontWeight: '900', color: '#d97706', marginTop: 4}}>{menuAggregates[type][sub][itemName]} <Text style={{fontSize: 13, color: '#64748b'}}>લોકો માટે</Text></Text>
-                        </View>
-                      ))}
+                <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                  <View style={{flex: 1}}>
+                    <Text style={{fontSize: 18, fontWeight: '900', color: '#1e293b'}}>📍 {ds.placeName}</Text>
+                    <Text style={{fontSize: 15, fontWeight: 'bold', color: '#047857', marginTop: 3}}>{ds.mainType} • {ds.guestsCount} લોકો</Text>
+                    <View style={{marginTop: 8, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 6}}>
+                      <Text style={{color: '#334155', fontSize: 13}}>🍽️ {ds.items.join(', ')}</Text>
+                      {ds.note ? <Text style={{color: '#dc2626', fontSize: 13, fontWeight: 'bold', marginTop: 4}}>📝 રસોઈ નોંધ: {ds.note}</Text> : null}
                     </View>
                   </View>
-                ))}
+                  <View style={{alignItems: 'flex-end', justifyContent: 'flex-start', paddingLeft: 10}}>
+                    <Text style={{color: '#64748b', fontWeight: 'bold', fontSize: 12}}>યજમાન:</Text>
+                    <Text style={{color: '#1e293b', fontWeight: '900', fontSize: 14}}>{ds.hostName}</Text>
+                    {ds.mobile ? (
+                      <Pressable onPress={() => Linking.openURL(`tel:${ds.mobile}`)} style={[{marginTop: 6, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: '#e0f2fe', borderRadius: 6}, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}>
+                        <Text style={{color: '#0369a1', fontWeight: 'bold', fontSize: 12}}>📞 કૉલ</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               </View>
-            );
-          })}
+            ))}
+          </View>
+        )}
+      </View>
 
-          {notesList.length > 0 && (
-            <View style={[s.formCard, {backgroundColor: '#fefce8', borderColor: '#fde047'}]}>
-              <Text style={{fontSize: 20, fontWeight: '900', color: '#854d0e', marginBottom: 12}}>📝 રસોડા માટે ખાસ સૂચનાઓ</Text>
-              {notesList.map((n, idx) => (
-                <View key={idx} style={{padding: 12, backgroundColor: '#fff', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#fef08a'}}>
-                  <Text style={{fontWeight: 'bold', color: '#1e3a8a'}}>⏰ {n.time} • 📍 {n.place} • {n.mainType} ({n.guests} લોકો)</Text>
-                  <Text style={{color: '#dc2626', fontWeight: 'bold', fontSize: 15, marginTop: 4}}>⚠️ {n.note}</Text>
+      {/* રસોડા માટે જથ્થો / આઇટમ્સ લિસ્ટ */}
+      <View style={{gap: 20}}>
+        <Text style={[s.sectionTitle, {fontSize: 22}]}>👨‍🍳 વાનગી મુજબ જથ્થો (Production Menu)</Text>
+        {Object.keys(menuAggregates).length === 0 ? (
+          <View style={[s.formCard, {alignItems: 'center', padding: 30}]}>
+            <Text style={{fontSize: 16, color: '#64748b', fontWeight: 'bold'}}>આજે કોઈ મેનૂ બનાવવા માટે નથી.</Text>
+          </View>
+        ) : (
+          Object.keys(menuAggregates).map(type => (
+            <View key={type} style={s.formCard}>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#047857', paddingBottom: 10, marginBottom: 15}}>
+                <Text style={{fontSize: 22, fontWeight: '900', color: '#047857'}}>{type}</Text>
+                <View style={{backgroundColor: '#f0fdf4', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, borderWidth: 1, borderColor: '#bbf7d0'}}>
+                  <Text style={{color: '#047857', fontWeight: '900', fontSize: 15}}>👥 કુલ: {mealBreakdown[type] || 0} લોકો</Text>
+                </View>
+              </View>
+
+              {Object.keys(menuAggregates[type]).map(sub => (
+                <View key={sub} style={{marginBottom: 15}}>
+                  <Text style={{fontSize: 17, fontWeight: 'bold', color: '#b91c1c', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 6, marginBottom: 10}}>{sub}</Text>
+                  <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
+                    {Object.keys(menuAggregates[type][sub]).map(itemName => (
+                      <View key={itemName} style={{backgroundColor: '#f8fafc', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', minWidth: '22%'}}>
+                        <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b'}}>{itemName}</Text>
+                        <Text style={{fontSize: 18, fontWeight: '900', color: '#d97706', marginTop: 4}}>{menuAggregates[type][sub][itemName]} <Text style={{fontSize: 13, color: '#64748b'}}>લોકો માટે</Text></Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               ))}
             </View>
-          )}
-        </View>
-      )}
+          ))
+        )}
+
+        {notesList.length > 0 && (
+          <View style={[s.formCard, {backgroundColor: '#fefce8', borderColor: '#fde047'}]}>
+            <Text style={{fontSize: 20, fontWeight: '900', color: '#854d0e', marginBottom: 12}}>📝 રસોડા માટે ખાસ સૂચનાઓ</Text>
+            {notesList.map((n, idx) => (
+              <View key={idx} style={{padding: 12, backgroundColor: '#fff', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#fef08a'}}>
+                <Text style={{fontWeight: 'bold', color: '#1e3a8a'}}>⏰ {n.time} • 📍 {n.place} • {n.mainType} ({n.guests} લોકો)</Text>
+                <Text style={{color: '#dc2626', fontWeight: 'bold', fontSize: 15, marginTop: 4}}>⚠️ {n.note}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
 
+// ================= ADMIN PLACES =================
 function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
   const [places, setPlaces] = useState<any[]>([]);
@@ -773,9 +889,9 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
   async function savePlace() {
     if (!name.trim() || !supabase) return Alert.alert('Error', 'સ્થળનું નામ લખો');
     if (editingId) {
-      await supabase.from('places').update({ name }).eq('id', editingId);
+      await supabase.from('places').update({ name: name.trim() }).eq('id', editingId);
     } else {
-      await supabase.from('places').insert([{ name: name, is_active: true }]);
+      await supabase.from('places').insert([{ name: name.trim(), is_active: true }]);
     }
     setName(''); setEditingId(null); fetchPlaces();
   }
@@ -811,8 +927,16 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
       
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>{editingId ? 'સ્થળ એડિટ કરો' : 'નવું સ્થળ ઉમેરો'}</Text>
-        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="સ્થળનું નામ (દા.ત. ડાઇનિંગ હોલ)" placeholderTextColor="#9ca3af" />
-        <Pressable onPress={savePlace} style={s.primary}><Text style={s.primaryText}>{editingId ? 'ફેરફાર સેવ કરો' : '＋ સ્થળ ઉમેરો'}</Text></Pressable>
+        <TextInput 
+          style={s.input} 
+          value={name} 
+          onChangeText={setName} 
+          placeholder="સ્થળનું નામ (દા.ત. ડાઇનિંગ હોલ)" 
+          placeholderTextColor="#9ca3af" 
+          onSubmitEditing={savePlace} 
+          returnKeyType="done"
+        />
+        <Pressable onPress={savePlace} style={s.primary}><Text style={s.primaryText}>{editingId ? 'ફેરફાર સેવ કરો (Enter)' : '＋ સ્થળ ઉમેરો (Enter)'}</Text></Pressable>
         {editingId && <Pressable onPress={()=>{setEditingId(null); setName('');}} style={s.closeButton}><Text>કેન્સલ એડિટિંગ</Text></Pressable>}
       </View>
 
@@ -836,10 +960,11 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ================= ADMIN MENU SCREEN (FIXED ROTLI BUG + ENTER SUPPORT) =================
 function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
   const [mainType, setMainType] = useState('લંચ');
-  const [subCategory, setSubCategory] = useState(''); 
+  const [subCategory, setSubCategory] = useState('રોટલી'); 
   const [price, setPrice] = useState(''); 
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -848,7 +973,15 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({});
 
   useEffect(() => { fetchMenu(); }, []);
-  useEffect(() => { if(!editingId) setSubCategory(MENU_STRUCTURE[mainType][0]); }, [mainType, editingId]);
+  
+  useEffect(() => { 
+    if(!editingId) {
+      const availableSubs = MENU_STRUCTURE[mainType] || [];
+      if (!availableSubs.includes(subCategory)) {
+        setSubCategory(availableSubs[0] || 'રોટલી');
+      }
+    } 
+  }, [mainType, editingId]);
 
   async function fetchMenu() {
     if (!supabase) return;
@@ -857,18 +990,34 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   }
 
   async function saveMenu() {
-    if (!name || !price || !supabase) return Alert.alert('Error', 'વિગતો ભરો');
-    const payload = { name, main_type: mainType, meal_type: 'lunch', sub_category: subCategory, price: parseFloat(price), is_active: true };
-    if (editingId) {
-      await supabase.from('menu_items').update(payload).eq('id', editingId);
-    } else {
-      await supabase.from('menu_items').insert([payload]);
+    if (!name.trim() || !price || !supabase) return Alert.alert('Error', 'વાનગીનું નામ અને ભાવ લખો.');
+    
+    const finalSub = subCategory || 'રોટલી';
+    const payload = { 
+      name: name.trim(), 
+      main_type: mainType, 
+      meal_type: mainType === 'ડિનર' ? 'dinner' : (mainType === 'નાસ્તો' ? 'breakfast' : 'lunch'), 
+      sub_category: finalSub, 
+      price: parseFloat(price) || 0, 
+      is_active: true 
+    };
+
+    try {
+      if (editingId) {
+        const { error } = await supabase.from('menu_items').update(payload).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('menu_items').insert([payload]);
+        if (error) throw error;
+      }
+      setName(''); setPrice(''); setEditingId(null); fetchMenu(); Alert.alert('Success', 'વાનગી સફળતાપૂર્વક સેવ થઈ ગઈ!');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'વાનગી સેવ કરવામાં ભૂલ આવી.');
     }
-    setName(''); setPrice(''); setEditingId(null); fetchMenu(); Alert.alert('Success', 'વાનગી સેવ થઈ ગઈ!');
   }
 
   function openEdit(m: any) {
-    setEditingId(m.id); setName(m.name); setMainType(m.main_type); setSubCategory(m.sub_category); setPrice(m.price.toString());
+    setEditingId(m.id); setName(m.name); setMainType(m.main_type); setSubCategory(m.sub_category || 'રોટલી'); setPrice(m.price.toString());
     setExpandedSubs({[`${m.main_type}_${m.sub_category}`]: true});
   }
 
@@ -897,7 +1046,6 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   }
 
   const toggleSub = (key: string) => setExpandedSubs(prev => ({...prev, [key]: !prev[key]}));
-
   const filteredMenuItems = menuItems.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
@@ -906,11 +1054,20 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
       <Text style={s.h1}>મેનૂ મેનેજમેન્ટ</Text>
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>{editingId ? 'વાનગી એડિટ કરો' : 'નવી વાનગી ઉમેરો'}</Text>
-        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="વાનગીનું નામ (દા.ત. પૌવા બટેટા)" placeholderTextColor="#9ca3af" />
+        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="વાનગીનું નામ (દા.ત. રોટલી, ભાખરી, પૂરી)" placeholderTextColor="#9ca3af" />
         <Dropdown label="કયા જમણવારમાં ઉમેરવી છે?" options={MAIN_TYPES.map(t => ({label: t, value: t}))} selectedValue={mainType} onSelect={setMainType} />
-        <Dropdown label="વાનગીનો પ્રકાર (કેટેગરી)" options={MENU_STRUCTURE[mainType].map(t => ({label: t, value: t}))} selectedValue={subCategory} onSelect={setSubCategory} />
-        <TextInput style={s.input} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="ભાવ (₹)" placeholderTextColor="#9ca3af" />
-        <Pressable onPress={saveMenu} style={s.primary}><Text style={s.primaryText}>{editingId ? 'ફેરફાર સેવ કરો' : '＋ વાનગી ઉમેરો'}</Text></Pressable>
+        <Dropdown label="વાનગીનો પ્રકાર (કેટેગરી)" options={(MENU_STRUCTURE[mainType] || []).map(t => ({label: t, value: t}))} selectedValue={subCategory} onSelect={setSubCategory} />
+        <TextInput 
+          style={s.input} 
+          value={price} 
+          onChangeText={setPrice} 
+          keyboardType="numeric" 
+          placeholder="ભાવ (₹)" 
+          placeholderTextColor="#9ca3af" 
+          onSubmitEditing={saveMenu}
+          returnKeyType="done"
+        />
+        <Pressable onPress={saveMenu} style={s.primary}><Text style={s.primaryText}>{editingId ? 'ફેરફાર સેવ કરો (Enter)' : '＋ વાનગી ઉમેરો (Enter)'}</Text></Pressable>
         {editingId && <Pressable onPress={()=>{setEditingId(null); setName(''); setPrice('');}} style={s.closeButton}><Text>કેન્સલ એડિટિંગ</Text></Pressable>}
       </View>
       
@@ -928,11 +1085,14 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
         const itemsInType = filteredMenuItems.filter(m => m.main_type === type);
         if (itemsInType.length === 0) return null;
         
+        // ડાયનેમિક સબ-કેટેગરી જેથી કોઈ વાનગી છૂટી ન જાય
+        const distinctSubs = Array.from(new Set([...(MENU_STRUCTURE[type] || []), ...itemsInType.map(i => i.sub_category).filter(Boolean)]));
+
         return (
           <View key={type} style={{marginBottom: 20}}>
             <Text style={s.mainTypeHeader}>{type}</Text>
             
-            {MENU_STRUCTURE[type].map(sub => {
+            {distinctSubs.map(sub => {
               const itemsInSub = itemsInType.filter(m => m.sub_category === sub);
               if (itemsInSub.length === 0) return null;
               
@@ -1044,11 +1204,13 @@ function AllBookingsScreen({ onBack, session, isAdmin }: { onBack: () => void, s
   );
 }
 
-// ================= COUNTER MODULE =================
+// ================= COUNTER MODULE (UPDATED WITH MEAL-WISE TODAY GUESTS & LIFETIME CARD) =================
 function CounterHome({ session }: { session: Session }) {
   const [activeTab, setActiveTab] = useState<'home'|'new_booking'|'all_bookings'>('home');
-  const [stats, setStats] = useState({ count: 0, guests: 0 }); 
+  const [stats, setStats] = useState({ count: 0, lifetimeGuests: 0 }); 
   const [todaysMeals, setTodaysMeals] = useState<any[]>([]);
+  const [todayGuestsTotal, setTodayGuestsTotal] = useState(0);
+  const [todayGuestsByMeal, setTodayGuestsByMeal] = useState<Record<string, number>>({});
   const [places, setPlaces] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [editingBooking, setEditingBooking] = useState<any>(null);
@@ -1064,14 +1226,29 @@ function CounterHome({ session }: { session: Session }) {
       if (error) throw error;
       
       if (data) {
-        let totalGuests = 0;
-        data.forEach(b => { if (b.meals) { b.meals.forEach((m:any) => totalGuests += (m.guestsCount || 0)); } });
-        setStats({ count: data.length, guests: totalGuests }); 
-        
-        const today = new Date();
-        const todayDDMMYYYY = `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getFullYear()}`;
+        let totalAllGuests = 0;
+        let todayGTotal = 0;
+        let mealMap: Record<string, number> = {};
+        const todayStr = getTodayStr();
 
-        const todaysBookings = data.filter(b => b.meals && b.meals.some((m:any) => m.date === todayDDMMYYYY));
+        data.forEach(b => {
+          if (b.meals) {
+            b.meals.forEach((m: any) => {
+              const g = m.guestsCount || 0;
+              totalAllGuests += g;
+              if (m.date === todayStr) {
+                todayGTotal += g;
+                mealMap[m.mainType] = (mealMap[m.mainType] || 0) + g;
+              }
+            });
+          }
+        });
+
+        setStats({ count: data.length, lifetimeGuests: totalAllGuests });
+        setTodayGuestsTotal(todayGTotal);
+        setTodayGuestsByMeal(mealMap);
+
+        const todaysBookings = data.filter(b => b.meals && b.meals.some((m:any) => m.date === todayStr));
         setTodaysMeals(todaysBookings); 
       }
       if (pData) setPlaces(pData);
@@ -1112,9 +1289,39 @@ function CounterHome({ session }: { session: Session }) {
     <View style={s.p18}>
       <Text style={s.h1}>કેશ કાઉન્ટર ડેશબોર્ડ</Text>
       
+      {/* ૧. કુલ બુકિંગ્સ અને અત્યાર સુધીના કુલ યજમાનો કાર્ડ */}
       <View style={s.grid}>
-        <Card title="કુલ બુકિંગ્સ" icon="📋" value={stats.count.toString()} />
-        <Card title="કુલ યજમાનો (Guests)" icon="👥" value={stats.guests.toLocaleString()} />
+        <Card title="કુલ બુકિંગ્સ (Lifetime)" icon="📋" value={stats.count.toString()} />
+        <Card title="અત્યાર સુધીના કુલ યજમાનો" icon="👥" value={stats.lifetimeGuests.toLocaleString()} />
+      </View>
+
+      {/* ૨. આજના યજમાનો (જમણવાર મુજબ અને આજના કુલ યજમાન) */}
+      <View style={[s.todayGuestsCard, {marginBottom: 16}]}>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+            <Text style={{fontSize: 22}}>🍽️</Text>
+            <Text style={{fontSize: 17, fontWeight: '900', color: '#065f46'}}>આજના યજમાનો (Today's Guests)</Text>
+          </View>
+          <Text style={{color: '#047857', fontWeight: 'bold', fontSize: 13}}>🗓️ {getTodayStr()}</Text>
+        </View>
+
+        {Object.keys(todayGuestsByMeal).length === 0 ? (
+          <Text style={{color: '#64748b', fontSize: 14, marginTop: 4}}>આજે કોઈ જમણવાર નોંધાયેલ નથી.</Text>
+        ) : (
+          <View style={{marginTop: 6}}>
+            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10}}>
+              {Object.keys(todayGuestsByMeal).map(mType => (
+                <View key={mType} style={s.mealPill}>
+                  <Text style={{fontSize: 14, color: '#1e293b'}}><Text style={{fontWeight: '900', color: '#047857'}}>{mType}:</Text> {todayGuestsByMeal[mType]} લોકો</Text>
+                </View>
+              ))}
+            </View>
+            <View style={{borderTopWidth: 1, borderTopColor: '#a7f3d0', paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+              <Text style={{fontSize: 15, fontWeight: '800', color: '#065f46'}}>👉 આજના કુલ યજમાન:</Text>
+              <Text style={{fontSize: 24, fontWeight: '900', color: '#047857'}}>{todayGuestsTotal.toLocaleString()} લોકો</Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <Pressable onPress={() => setActiveTab('new_booking')} style={[s.primary, {marginBottom: 20}]}>
@@ -1122,7 +1329,7 @@ function CounterHome({ session }: { session: Session }) {
       </Pressable>
       
       <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
-        <Text style={s.sectionTitle}>આજની તારીખના જમણવાર</Text>
+        <Text style={s.sectionTitle}>આજની તારીખના જમણવાર ({todaysMeals.length})</Text>
         <Pressable onPress={fetchDashboard} style={s.refreshBtn}>
           <Text style={s.refreshBtnText}>{refreshing ? 'Loading...' : '🔄 રિફ્રેશ'}</Text>
         </Pressable>
@@ -1396,7 +1603,7 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
               onChangeText={setSearchQuery} 
             />
 
-            {MENU_STRUCTURE[mainType].map(sub => {
+            {(MENU_STRUCTURE[mainType] || []).map(sub => {
               const items = filteredMenu.filter((m:any) => m.sub_category === sub);
               if (items.length === 0) return null;
               
@@ -1643,7 +1850,9 @@ const s = StyleSheet.create({
   grid:{flexDirection:'row',flexWrap:'wrap',gap:12,marginVertical:15}, 
   card:{backgroundColor:'#ffffff',borderRadius:16,padding:18,width:'48%',minHeight:110,borderWidth:1,borderColor:'#e2e8f0', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.04, shadowRadius:8, elevation:2}, 
   icon:{fontSize:28}, 
-  value:{fontSize:28,fontWeight:'900',marginTop:6, color: '#1e293b'}, 
+  value:{fontSize:26,fontWeight:'900',marginTop:6, color: '#1e293b'}, 
+  todayGuestsCard: { backgroundColor: '#f0fdf4', borderRadius: 16, padding: 18, borderWidth: 1.5, borderColor: '#6ee7b7', marginVertical: 10, shadowColor: '#047857', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  mealPill: { backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#a7f3d0' },
   input:{backgroundColor:'#ffffff',borderWidth:1,borderColor:'#cbd5e1',borderRadius:10,padding:14,marginBottom:14,fontSize:16, color: '#1e293b'}, 
   label:{fontWeight:'700',marginBottom:6, marginTop:4, color: '#334155', fontSize: 14}, 
   primary:{backgroundColor:'#047857',padding:16,borderRadius:12,alignItems:'center',marginVertical:6, shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.1, elevation:2}, 
