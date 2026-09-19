@@ -5,7 +5,7 @@ import type { Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 type Role = 'admin' | 'counter' | 'production' | 'dispatch';
-type Profile = { id: string; full_name: string | null; mobile: string | null; role: Role; is_active: boolean; duty_place?: string; photo_url?: string; login_email?: string; login_pass?: string };
+type Profile = { id: string; full_name: string | null; mobile: string | null; role: Role; is_active: boolean; duty_places?: string[]; photo_url?: string; login_email?: string; login_pass?: string };
 
 const roleLabel: Record<Role, string> = { admin: 'Super Admin', counter: 'Cash Counter', production: 'Production (રસોડું)', dispatch: 'Dispatch' };
 
@@ -66,7 +66,20 @@ export default function App() {
         await supabase.auth.signOut();
         return;
       }
-      setProfile(data as Profile);
+      
+      // Parse duty_places array (Handles migration from single string to JSON array)
+      let parsedPlaces: string[] = [];
+      if (data.duty_places) {
+          if (Array.isArray(data.duty_places)) parsedPlaces = data.duty_places;
+          else if (typeof data.duty_places === 'string') {
+              try { parsedPlaces = JSON.parse(data.duty_places); } 
+              catch(e) { parsedPlaces = [data.duty_places]; }
+          }
+      } else if ((data as any).duty_place) { // Fallback for old single duty_place column
+          parsedPlaces = [(data as any).duty_place];
+      }
+      
+      setProfile({...data, duty_places: parsedPlaces} as Profile);
     }
     loadProfile();
     return () => { mounted = false; };
@@ -442,7 +455,276 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN USERS (FULL EDIT + PLACE SELECTION) =================
+// ================= ADMIN MENU SCREEN (DYNAMIC CATS & CATEGORY MANAGER) =================
+function AdminMenuScreen({ onBack }: { onBack: () => void }) {
+  const [name, setName] = useState('');
+  const [mainType, setMainType] = useState('લંચ');
+  const [subCategory, setSubCategory] = useState('રોટલી'); 
+  const [price, setPrice] = useState(''); 
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [dynamicMainTypes, setDynamicMainTypes] = useState<string[]>(BASE_MAIN_TYPES);
+  const [dynamicSubTypes, setDynamicSubTypes] = useState<string[]>(BASE_SUB_TYPES);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({});
+
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [promptData, setPromptData] = useState<{visible:boolean, title:string, type:'main'|'sub'|'addMain'|'addSub', oldValue?:string, value:string}>({visible:false, title:'', type:'main', value:''});
+
+  useEffect(() => { fetchMenu(); }, []);
+
+  async function fetchMenu() {
+    if (!supabase) return;
+    const { data } = await supabase.from('menu_items').select('*').order('created_at', { ascending: false });
+    if (data) {
+      setMenuItems(data);
+      const mains = Array.from(new Set([...BASE_MAIN_TYPES, ...data.map(d=>d.main_type).filter(Boolean)]));
+      const subs = Array.from(new Set([...BASE_SUB_TYPES, ...data.map(d=>d.sub_category).filter(Boolean)]));
+      setDynamicMainTypes(mains);
+      setDynamicSubTypes(subs);
+      if (!mains.includes(mainType)) setMainType(mains[0] || 'લંચ');
+      if (!subs.includes(subCategory)) setSubCategory('રોટલી');
+    }
+  }
+
+  async function saveMenu() {
+    if (!name.trim() || !price || !supabase) return Alert.alert('Error', 'વાનગીનું નામ અને ભાવ લખો.');
+    const finalSub = subCategory || 'રોટલી';
+    const payload = { 
+      name: name.trim(), main_type: mainType, meal_type: 'custom', sub_category: finalSub, price: parseFloat(price) || 0, is_active: true 
+    };
+    try {
+      if (editingId) {
+        const { error } = await supabase.from('menu_items').update(payload).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('menu_items').insert([payload]);
+        if (error) throw error;
+      }
+      setName(''); setPrice(''); setEditingId(null); fetchMenu(); Alert.alert('Success', 'વાનગી સફળતાપૂર્વક સેવ થઈ ગઈ!');
+    } catch (err: any) { Alert.alert('Error', err.message); }
+  }
+
+  function openEdit(m: any) {
+    setEditingId(m.id); setName(m.name); setMainType(m.main_type); setSubCategory(m.sub_category || 'રોટલી'); setPrice(m.price.toString());
+    setExpandedSubs({[`${m.main_type}_${m.sub_category}`]: true});
+  }
+
+  async function toggleStatus(id: string, current: boolean) {
+    if (!supabase) return;
+    await supabase.from('menu_items').update({ is_active: !current }).eq('id', id);
+    fetchMenu();
+  }
+
+  async function deleteMenu(id: string) {
+    const msg = 'આ વાનગી કાઢી નાખવી છે?';
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) { await supabase!.from('menu_items').delete().eq('id', id); fetchMenu(); }
+      return;
+    }
+    Alert.alert('કન્ફર્મ કરો', msg, [ { text: 'ના', style: 'cancel' }, { text: 'હા, કાઢો', style: 'destructive', onPress: async () => { await supabase!.from('menu_items').delete().eq('id', id); fetchMenu(); }}]);
+  }
+
+  // --- Category Management Actions ---
+  async function savePrompt() {
+    if(!promptData.value.trim()) { setPromptData({...promptData, visible:false}); return; }
+    if(!supabase) return;
+    const newVal = promptData.value.trim();
+
+    try {
+      if(promptData.type === 'main' && promptData.oldValue) {
+        await supabase.from('menu_items').update({main_type: newVal}).eq('main_type', promptData.oldValue);
+      } else if (promptData.type === 'sub' && promptData.oldValue) {
+        await supabase.from('menu_items').update({sub_category: newVal}).eq('sub_category', promptData.oldValue);
+      } else if (promptData.type === 'addMain') {
+        setMainType(newVal);
+      } else if (promptData.type === 'addSub') {
+        setSubCategory(newVal);
+      }
+      fetchMenu();
+    } catch(err:any) { Alert.alert('Error', err.message); }
+    setPromptData({visible:false, title:'', type:'main', value:''});
+  }
+
+  async function deleteCategory(type: 'main'|'sub', val: string) {
+    const msg = `શું તમે '${val}' કાયમ માટે કાઢી નાખવા માંગો છો? તેમાં રહેલી વાનગીઓ પણ ડીલીટ થઈ જશે!`;
+    if (Platform.OS === 'web' && !window.confirm(msg)) return;
+    if (Platform.OS !== 'web') {
+      Alert.alert('ચેતવણી', msg, [{text:'ના', style:'cancel'}, {text:'હા, ડીલીટ કરો', style:'destructive', onPress: () => execDelete(type, val)}]);
+      return;
+    }
+    execDelete(type, val);
+  }
+
+  async function execDelete(type: 'main'|'sub', val: string) {
+    if(!supabase) return;
+    if(type === 'main') await supabase.from('menu_items').delete().eq('main_type', val);
+    else await supabase.from('menu_items').delete().eq('sub_category', val);
+    fetchMenu();
+  }
+
+  const filteredMenuItems = menuItems.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  return (
+    <View style={s.p18}>
+      <Pressable onPress={onBack} style={s.backButton}><Text style={s.backText}>‹ પાછા</Text></Pressable>
+      
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap:'wrap', gap:10}}>
+        <Text style={s.h1}>મેનૂ મેનેજમેન્ટ</Text>
+        <Pressable onPress={()=>setShowCatManager(true)} style={[s.refreshBtn, {backgroundColor: '#1e293b'}]}>
+          <Text style={[s.refreshBtnText, {color: '#fff'}]}>⚙️ કેટેગરી અને જમણવાર સેટિંગ્સ</Text>
+        </Pressable>
+      </View>
+
+      <View style={s.formCard}>
+        <Text style={s.sectionTitle}>{editingId ? 'વાનગી એડિટ કરો' : 'નવી વાનગી ઉમેરો'}</Text>
+        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="વાનગીનું નામ (દા.ત. રોટલી, ભાખરી)" placeholderTextColor="#9ca3af" />
+        
+        <Dropdown label="કયા જમણવારમાં ઉમેરવી છે?" options={dynamicMainTypes.map(t => ({label: t, value: t}))} selectedValue={mainType} onSelect={setMainType} onAddNew={()=>setPromptData({visible:true, title:'નવો જમણવાર ઉમેરો', type:'addMain', value:''})} />
+        
+        <Dropdown label="વાનગીનો પ્રકાર (કેટેગરી)" options={dynamicSubTypes.map(t => ({label: t, value: t}))} selectedValue={subCategory} onSelect={setSubCategory} onAddNew={()=>setPromptData({visible:true, title:'નવો વાનગીનો પ્રકાર ઉમેરો', type:'addSub', value:''})} />
+        
+        <TextInput style={s.input} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="ભાવ (₹)" placeholderTextColor="#9ca3af" onSubmitEditing={saveMenu} returnKeyType="done" />
+        <Pressable onPress={saveMenu} style={s.primary}><Text style={s.primaryText}>{editingId ? 'ફેરફાર સેવ કરો (Enter)' : '＋ વાનગી ઉમેરો (Enter)'}</Text></Pressable>
+        {editingId && <Pressable onPress={()=>{setEditingId(null); setName(''); setPrice('');}} style={s.closeButton}><Text>કેન્સલ એડિટિંગ</Text></Pressable>}
+      </View>
+      
+      <Text style={[s.h1, {marginTop: 20}]}>તમામ મેનૂ</Text>
+      <TextInput style={[s.input, {borderColor: '#047857', borderWidth: 2}]} placeholder="🔍 અહીં વાનગીનું નામ શોધો..." placeholderTextColor="#9ca3af" value={searchQuery} onChangeText={setSearchQuery} />
+
+      {dynamicMainTypes.map(type => {
+        const itemsInType = filteredMenuItems.filter(m => m.main_type === type);
+        if (itemsInType.length === 0) return null;
+        
+        const distinctSubs = Array.from(new Set(itemsInType.map(i => i.sub_category).filter(Boolean)));
+
+        return (
+          <View key={type} style={{marginBottom: 20}}>
+            <Text style={s.mainTypeHeader}>{type}</Text>
+            {distinctSubs.map(sub => {
+              const itemsInSub = itemsInType.filter(m => m.sub_category === sub);
+              if (itemsInSub.length === 0) return null;
+              const key = `${type}_${sub}`;
+              const isExpanded = expandedSubs[key] || searchQuery.length > 0;
+              return (
+                <View key={sub} style={{marginLeft: 10, marginBottom: 10}}>
+                  <Pressable onPress={() => setExpandedSubs(p=>({...p, [key]:!p[key]}))} style={s.collapsibleHeader}>
+                     <Text style={s.collapsibleHeaderText}>{sub} ({itemsInSub.length})</Text>
+                     <Text style={s.collapsibleHeaderIcon}>{isExpanded ? '▲' : '▼'}</Text>
+                  </Pressable>
+                  {isExpanded && (
+                    <View style={{paddingLeft: 10, paddingTop: 10}}>
+                      {itemsInSub.map(m => (
+                        <View key={m.id} style={s.listCard}>
+                          <View style={{flex:1}}><Text style={{fontWeight:'bold', color: m.is_active?'#1e293b':'#94a3b8', textDecorationLine: m.is_active?'none':'line-through'}}>{m.name}</Text><Text style={{color:'#047857', fontWeight:'bold', marginTop: 2}}>₹{m.price}</Text></View>
+                          <View style={{alignItems: 'flex-end', gap: 6}}>
+                             <View style={[s.statusBadge, {backgroundColor: m.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: m.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{m.is_active ? 'Active' : 'Inactive'}</Text></View>
+                             <View style={{flexDirection:'row', gap: 5}}>
+                              <Pressable onPress={() => openEdit(m)} style={s.editBtn}><Text>✏️</Text></Pressable>
+                              <Pressable onPress={() => toggleStatus(m.id, m.is_active)} style={s.editBtn}><Text style={s.editBtnText}>{m.is_active ? 'બંધ' : 'ચાલુ'}</Text></Pressable>
+                              <Pressable onPress={() => deleteMenu(m.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+
+      <Modal visible={showCatManager} animationType="slide">
+        <SafeAreaView style={s.safe}>
+           <View style={[s.header, {paddingTop: Platform.OS==='web'?20:0}]}><Text style={s.h1}>કેટેગરી મેનેજમેન્ટ</Text><Pressable onPress={()=>setShowCatManager(false)}><Text style={{fontSize:24, color:'#64748b'}}>✕</Text></Pressable></View>
+           <ScrollView contentContainerStyle={[s.webContainer, s.p18]}>
+              <View style={s.formCard}>
+                <Text style={s.sectionTitle}>જમણવાર ના પ્રકાર (Meal Types)</Text>
+                {dynamicMainTypes.map(t => (
+                  <View key={t} style={{flexDirection:'row', justifyContent:'space-between', paddingVertical:12, borderBottomWidth:1, borderColor:'#eee', alignItems:'center'}}>
+                    <Text style={{fontSize:16, fontWeight:'bold', color:'#1e293b'}}>{t}</Text>
+                    <View style={{flexDirection:'row', gap:8}}>
+                       <Pressable onPress={()=>setPromptData({visible:true, title:'જમણવાર એડિટ કરો', type:'main', oldValue:t, value:t})} style={s.editBtn}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
+                       <Pressable onPress={()=>deleteCategory('main', t)} style={[s.editBtn, {borderColor:'#fca5a5', backgroundColor:'#fef2f2'}]}><Text style={[s.editBtnText, {color:'#dc2626'}]}>🗑️ ડીલીટ</Text></Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              <View style={[s.formCard, {marginTop: 20}]}>
+                <Text style={s.sectionTitle}>વાનગી ના પ્રકાર (Categories)</Text>
+                {dynamicSubTypes.map(t => (
+                  <View key={t} style={{flexDirection:'row', justifyContent:'space-between', paddingVertical:12, borderBottomWidth:1, borderColor:'#eee', alignItems:'center'}}>
+                    <Text style={{fontSize:16, fontWeight:'bold', color:'#1e293b'}}>{t}</Text>
+                    <View style={{flexDirection:'row', gap:8}}>
+                       <Pressable onPress={()=>setPromptData({visible:true, title:'વાનગીનો પ્રકાર એડિટ કરો', type:'sub', oldValue:t, value:t})} style={s.editBtn}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
+                       <Pressable onPress={()=>deleteCategory('sub', t)} style={[s.editBtn, {borderColor:'#fca5a5', backgroundColor:'#fef2f2'}]}><Text style={[s.editBtnText, {color:'#dc2626'}]}>🗑️ ડીલીટ</Text></Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+           </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={promptData.visible} transparent animationType="fade">
+        <View style={s.modalBg}>
+          <View style={s.modalContent}>
+            <Text style={s.modalTitle}>{promptData.title}</Text>
+            <TextInput style={s.input} value={promptData.value} onChangeText={(v)=>setPromptData({...promptData, value:v})} onSubmitEditing={savePrompt} returnKeyType="done" autoFocus />
+            <Pressable onPress={savePrompt} style={s.primary}><Text style={s.primaryText}>સેવ કરો (Enter)</Text></Pressable>
+            <Pressable onPress={()=>setPromptData({visible:false, title:'', type:'main', value:''})} style={s.closeButton}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+// ================= ADMIN PLACES SCREEN =================
+function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
+  const [name, setName] = useState(''); const [places, setPlaces] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
+  useEffect(() => { fetchPlaces(); }, []);
+  async function fetchPlaces() { if (!supabase) return; const { data } = await supabase.from('places').select('*').order('created_at', { ascending: true }); if (data) setPlaces(data); }
+  async function savePlace() {
+    if (!name.trim() || !supabase) return Alert.alert('Error', 'સ્થળનું નામ લખો');
+    if (editingId) await supabase.from('places').update({ name: name.trim() }).eq('id', editingId); else await supabase.from('places').insert([{ name: name.trim(), is_active: true }]);
+    setName(''); setEditingId(null); fetchPlaces();
+  }
+  async function toggleStatus(id: string, current: boolean) { await supabase!.from('places').update({ is_active: !current }).eq('id', id); fetchPlaces(); }
+  async function deletePlace(id: string) {
+    const msg = 'આ સ્થળ કાઢી નાખવું છે?';
+    if (Platform.OS === 'web') { if (window.confirm(msg)) { await supabase!.from('places').delete().eq('id', id); fetchPlaces(); } return; }
+    Alert.alert('કન્ફર્મ', msg, [{ text: 'ના' }, { text: 'હા', style: 'destructive', onPress: async () => { await supabase!.from('places').delete().eq('id', id); fetchPlaces(); }}]);
+  }
+  return (
+    <View style={s.p18}>
+      <Pressable onPress={onBack} style={s.backButton}><Text style={s.backText}>‹ પાછા</Text></Pressable>
+      <Text style={s.h1}>સ્થળ મેનેજમેન્ટ</Text>
+      <View style={s.formCard}>
+        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="સ્થળનું નામ" onSubmitEditing={savePlace} returnKeyType="done" />
+        <Pressable onPress={savePlace} style={s.primary}><Text style={s.primaryText}>સેવ કરો (Enter)</Text></Pressable>
+        {editingId && <Pressable onPress={()=>{setEditingId(null); setName('');}} style={s.closeButton}><Text>કેન્સલ</Text></Pressable>}
+      </View>
+      {places.map(p => (
+        <View key={p.id} style={s.listCard}>
+          <Text style={{fontWeight:'bold', fontSize: 16, textDecorationLine: p.is_active?'none':'line-through'}}>{p.name}</Text>
+          <View style={{flexDirection: 'row', gap: 5}}>
+            <Pressable onPress={() => {setEditingId(p.id); setName(p.name);}} style={s.editBtn}><Text>✏️</Text></Pressable>
+            <Pressable onPress={() => toggleStatus(p.id, p.is_active)} style={s.editBtn}><Text>{p.is_active?'બંધ':'ચાલુ'}</Text></Pressable>
+            <Pressable onPress={() => deletePlace(p.id)} style={[s.editBtn, {backgroundColor: '#fef2f2'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ================= ADMIN USERS (MULTIPLE PLACES SUPPORT) =================
 function AdminUsersScreen({ onBack }: { onBack: () => void }) {
   const [users, setUsers] = useState<any[]>([]); 
   const [places, setPlaces] = useState<any[]>([]);
@@ -450,7 +732,11 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const [name, setName] = useState(''); const [mobile, setMobile] = useState(''); const [role, setRole] = useState<Role>('counter');
-  const [dutyPlace, setDutyPlace] = useState(''); const [photoUrl, setPhotoUrl] = useState(''); 
+  
+  // Array to support multiple places for one counter
+  const [selectedDutyPlaces, setSelectedDutyPlaces] = useState<string[]>([]); 
+  
+  const [photoUrl, setPhotoUrl] = useState(''); 
   const [loginEmail, setLoginEmail] = useState(''); const [loginPass, setLoginPass] = useState('');
 
   useEffect(() => { fetchData(); }, []);
@@ -458,13 +744,28 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
     if (!supabase) return; 
     const { data: uData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
     const { data: pData } = await supabase.from('places').select('*').eq('is_active', true);
-    if (uData) setUsers(uData); 
+    
+    if (uData) {
+       const mappedUsers = uData.map(u => {
+          let pList: string[] = [];
+          if (u.duty_places) {
+             if(Array.isArray(u.duty_places)) pList = u.duty_places;
+             else if(typeof u.duty_places === 'string') {
+                try { pList = JSON.parse(u.duty_places); } catch(e) { pList = [u.duty_places]; }
+             }
+          } else if (u.duty_place) {
+             pList = [u.duty_place];
+          }
+          return {...u, duty_places: pList};
+       });
+       setUsers(mappedUsers); 
+    }
     if (pData) setPlaces(pData);
   }
 
   function openEdit(u: any) {
     setEditingId(u.id); setName(u.full_name || ''); setMobile(u.mobile || '');
-    setRole(u.role); setDutyPlace(u.duty_place || ''); setPhotoUrl(u.photo_url || '');
+    setRole(u.role); setSelectedDutyPlaces(u.duty_places || []); setPhotoUrl(u.photo_url || '');
     setLoginEmail(u.login_email || ''); setLoginPass(u.login_pass || '');
     setShowForm(true);
   }
@@ -474,11 +775,11 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
   
   async function saveUser() {
     if (!name || !loginEmail || (!loginPass && !editingId)) return Alert.alert('Error', 'નામ અને યુઝર ID ફરજિયાત છે.');
-    if (role === 'counter' && !dutyPlace) return Alert.alert('Error', 'કેશ કાઉન્ટર માટે સ્થળ પસંદ કરવું ફરજિયાત છે.');
+    if (role === 'counter' && selectedDutyPlaces.length === 0) return Alert.alert('Error', 'કેશ કાઉન્ટર માટે ઓછામાં ઓછું એક સ્થળ પસંદ કરવું ફરજિયાત છે.');
     if (!supabase) return;
     
     const authEmail = loginEmail.includes('@') ? loginEmail.toLowerCase() : `${loginEmail.toLowerCase()}@baps.local`;
-    const payload: any = { full_name: name, mobile, role, duty_place: dutyPlace || null, photo_url: photoUrl, login_email: loginEmail, is_active: true };
+    const payload: any = { full_name: name, mobile, role, duty_places: selectedDutyPlaces, photo_url: photoUrl, login_email: loginEmail, is_active: true };
     if (loginPass) payload.login_pass = loginPass;
     
     if (editingId) {
@@ -490,6 +791,14 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
       if (data.user) await supabase.from('profiles').insert([{ id: data.user.id, ...payload }]);
     }
     setShowForm(false); setEditingId(null); fetchData();
+  }
+
+  function togglePlaceSelection(placeId: string) {
+    if (selectedDutyPlaces.includes(placeId)) {
+        setSelectedDutyPlaces(selectedDutyPlaces.filter(id => id !== placeId));
+    } else {
+        setSelectedDutyPlaces([...selectedDutyPlaces, placeId]);
+    }
   }
 
   return (
@@ -504,7 +813,17 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
           <TextInput style={s.input} value={mobile} onChangeText={setMobile} placeholder="મોબાઈલ નંબર" keyboardType="phone-pad" />
           <Dropdown label="રોલ (Role)" options={[{label:'Super Admin', value:'admin'}, {label:'Cash Counter', value:'counter'}, {label:'Production (રસોડું)', value:'production'}, {label:'Dispatch', value:'dispatch'}]} selectedValue={role} onSelect={setRole} />
           
-          <Dropdown label="યુઝરનું સ્થળ (કેશ કાઉન્ટર માટે ફરજિયાત)" options={places.map(p=>({label: p.name, value: p.id}))} selectedValue={dutyPlace} onSelect={setDutyPlace} placeholder="સ્થળ પસંદ કરો" />
+          <Text style={s.label}>આ કાઉન્ટર માટે કયા સ્થળ માન્ય છે? (એકથી વધુ સિલેક્ટ કરી શકાય)</Text>
+          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 15, padding: 10, backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0'}}>
+             {places.map(p => {
+                 const isSelected = selectedDutyPlaces.includes(p.id);
+                 return (
+                     <Pressable key={p.id} onPress={() => togglePlaceSelection(p.id)} style={[s.chip, isSelected && s.chipSelected]}>
+                         <Text style={[s.chipText, isSelected && s.chipTextSelected]}>{p.name}</Text>
+                     </Pressable>
+                 )
+             })}
+          </View>
           
           <Text style={[s.sectionTitle, {marginTop: 15}]}>લોગિન માટેની વિગતો</Text>
           <TextInput style={s.input} value={loginEmail} onChangeText={setLoginEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" autoCapitalize="none" />
@@ -514,30 +833,34 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
           <Pressable onPress={() => {setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
         </View>
       ) : (
-        <Pressable onPress={() => {setEditingId(null); setName(''); setMobile(''); setLoginEmail(''); setLoginPass(''); setDutyPlace(''); setShowForm(true);}} style={[s.primary, {backgroundColor: '#4f46e5'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
+        <Pressable onPress={() => {setEditingId(null); setName(''); setMobile(''); setLoginEmail(''); setLoginPass(''); setSelectedDutyPlaces([]); setShowForm(true);}} style={[s.primary, {backgroundColor: '#4f46e5'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
       )}
 
       <Text style={[s.sectionTitle, {marginTop: 20}]}>સ્ટાફ લિસ્ટ</Text>
-      {users.map(u => (
-        <View key={u.id} style={s.listCard}>
-          <View style={{flex: 1}}>
-            <Text style={{fontWeight:'bold', fontSize:16, color: '#1e293b'}}>{u.full_name || 'No Name'}</Text>
-            <Text style={{color:'#64748b', fontSize: 13, marginTop: 4}}>ID: <Text style={{fontWeight: 'bold', color: '#1e293b'}}>{u.login_email}</Text> • {roleLabel[u.role as Role]} {u.duty_place ? `• 📍 ${places.find(p=>p.id===u.duty_place)?.name || 'Unknown'}` : ''}</Text>
-          </View>
-          <View style={{alignItems: 'flex-end', gap: 6}}>
-            <View style={[s.statusBadge, {backgroundColor: u.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: u.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{u.is_active ? 'Active' : 'Inactive'}</Text></View>
-            <View style={{flexDirection: 'row', gap: 5}}>
-              <Pressable onPress={() => openEdit(u)} style={s.editBtn}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
-              <Pressable onPress={() => deleteUser(u.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
+      {users.map(u => {
+          const placeNames = (u.duty_places || []).map((id:string) => places.find(p=>p.id===id)?.name || 'Unknown').join(', ');
+          return (
+            <View key={u.id} style={s.listCard}>
+              <View style={{flex: 1}}>
+                <Text style={{fontWeight:'bold', fontSize:16, color: '#1e293b'}}>{u.full_name || 'No Name'}</Text>
+                <Text style={{color:'#64748b', fontSize: 13, marginTop: 4}}>ID: <Text style={{fontWeight: 'bold', color: '#1e293b'}}>{u.login_email}</Text> • {roleLabel[u.role as Role]}</Text>
+                {placeNames ? <Text style={{color:'#0369a1', fontSize: 12, fontWeight: 'bold', marginTop: 4}}>📍 {placeNames}</Text> : null}
+              </View>
+              <View style={{alignItems: 'flex-end', gap: 6}}>
+                <View style={[s.statusBadge, {backgroundColor: u.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: u.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{u.is_active ? 'Active' : 'Inactive'}</Text></View>
+                <View style={{flexDirection: 'row', gap: 5}}>
+                  <Pressable onPress={() => openEdit(u)} style={s.editBtn}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
+                  <Pressable onPress={() => deleteUser(u.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
-      ))}
+          );
+      })}
     </View>
   );
 }
 
-// ================= COUNTER MODULE (BUG FIXED + ISOLATED DATA) =================
+// ================= COUNTER MODULE =================
 function CounterHome({ session, profile }: { session: Session, profile: Profile }) {
   const [activeTab, setActiveTab] = useState<'home'|'new_booking'|'all_bookings'>('home');
   const [stats, setStats] = useState({ count: 0, lifetimeGuests: 0 }); 
@@ -548,16 +871,24 @@ function CounterHome({ session, profile }: { session: Session, profile: Profile 
   const [refreshing, setRefreshing] = useState(false);
   const [editingBooking, setEditingBooking] = useState<any>(null);
 
+  const myDutyPlaces = profile.duty_places || [];
+
   useEffect(() => { if (activeTab === 'home') fetchDashboard(); }, [activeTab]);
 
   async function fetchDashboard() {
     if (!supabase) return;
     setRefreshing(true);
     try {
-      // Counter only sees bookings from their duty_place
+      // Counter only sees bookings from their assigned multiple places
       let query = supabase.from('bookings').select('*').order('created_at', { ascending: false });
-      if (profile.duty_place) {
-        query = query.eq('place_id', profile.duty_place);
+      
+      if (myDutyPlaces.length > 0) {
+        // Build an OR filter for all allowed places
+        const orQuery = myDutyPlaces.map(p => `place_id.eq.${p}`).join(',');
+        query = query.or(orQuery);
+      } else {
+        // If no duty places assigned, show nothing to be safe.
+        query = query.eq('id', '00000000-0000-0000-0000-000000000000'); 
       }
       
       const { data, error } = await query;
@@ -599,18 +930,18 @@ function CounterHome({ session, profile }: { session: Session, profile: Profile 
     }
   }
 
-  if (editingBooking) return <BookingScreen onBack={() => { setEditingBooking(null); fetchDashboard(); }} session={session} profile={profile} initialData={editingBooking} />;
-  if (activeTab === 'new_booking') return <BookingScreen onBack={() => {setActiveTab('home'); fetchDashboard();}} session={session} profile={profile} />;
+  if (editingBooking) return <BookingScreen onBack={() => { setEditingBooking(null); fetchDashboard(); }} session={session} profile={profile} initialData={editingBooking} allowedPlaces={places.filter(p=>myDutyPlaces.includes(p.id))} />;
+  if (activeTab === 'new_booking') return <BookingScreen onBack={() => {setActiveTab('home'); fetchDashboard();}} session={session} profile={profile} allowedPlaces={places.filter(p=>myDutyPlaces.includes(p.id))} />;
   if (activeTab === 'all_bookings') return <AllBookingsScreen onBack={() => {setActiveTab('home'); fetchDashboard();}} session={session} profile={profile} isAdmin={false} />;
 
-  const myPlaceName = places.find(p=>p.id === profile.duty_place)?.name || 'Unknown Location';
+  const myPlaceNames = places.filter(p=>myDutyPlaces.includes(p.id)).map(p=>p.name).join(', ') || 'Unknown Location';
 
   return (
     <View style={s.p18}>
       <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
         <Text style={s.h1}>કેશ કાઉન્ટર</Text>
-        <Text style={{backgroundColor: '#e0f2fe', color: '#0369a1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, fontWeight: 'bold'}}>📍 {myPlaceName}</Text>
       </View>
+      <Text style={{color: '#0369a1', fontSize: 13, fontWeight: 'bold', marginBottom: 15}}>📍 {myPlaceNames}</Text>
       
       <View style={s.grid}>
         <Card title="કુલ બુકિંગ્સ (Lifetime)" icon="📋" value={stats.count.toString()} />
@@ -672,14 +1003,21 @@ function AllBookingsScreen({ onBack, session, profile, isAdmin }: { onBack: () =
     setRefreshing(true);
     try {
       let query = supabase.from('bookings').select('*').order('created_at', { ascending: false });
-      if (profile.role === 'counter' && profile.duty_place) {
-        query = query.eq('place_id', profile.duty_place);
+      
+      if (profile.role === 'counter') {
+          const myDutyPlaces = profile.duty_places || [];
+          if (myDutyPlaces.length > 0) {
+              const orQuery = myDutyPlaces.map(p => `place_id.eq.${p}`).join(',');
+              query = query.or(orQuery);
+          } else {
+              query = query.eq('id', '00000000-0000-0000-0000-000000000000'); 
+          }
       }
+
       const { data, error } = await query;
       const { data: pData } = await supabase.from('places').select('*');
       if (error) throw error;
       if (data) {
-        // Sort explicitly by the most recent meal date to ensure today's bookings surface clearly.
         const sorted = data.sort((a,b) => {
           const aDate = a.meals && a.meals[0] ? a.meals[0].date.split('-').reverse().join('') : '0';
           const bDate = b.meals && b.meals[0] ? b.meals[0].date.split('-').reverse().join('') : '0';
@@ -696,7 +1034,10 @@ function AllBookingsScreen({ onBack, session, profile, isAdmin }: { onBack: () =
     else { Alert.alert('કન્ફર્મ', 'Delete?', [{ text: 'ના' }, { text: 'હા', style: 'destructive', onPress: async () => { await supabase!.from('bookings').delete().eq('id', id); fetchBookings(); }}]); }
   }
 
-  if (editingBooking) return <BookingScreen onBack={() => { setEditingBooking(null); fetchBookings(); }} session={session} profile={profile} initialData={editingBooking} />;
+  // Pass allowedPlaces to BookingScreen if counter
+  const allowedPlaces = (profile.role === 'counter') ? places.filter(p=> (profile.duty_places || []).includes(p.id)) : places;
+
+  if (editingBooking) return <BookingScreen onBack={() => { setEditingBooking(null); fetchBookings(); }} session={session} profile={profile} initialData={editingBooking} allowedPlaces={allowedPlaces} />;
 
   return (
     <View style={s.p18}>
@@ -716,17 +1057,20 @@ function AllBookingsScreen({ onBack, session, profile, isAdmin }: { onBack: () =
 }
 
 // ================= BOOKING SCREEN (COUNTER PLACE LOCK) =================
-function BookingScreen({ onBack, session, profile, initialData }: { onBack: () => void, session: Session, profile: Profile, initialData?: any }) {
-  const [places, setPlaces] = useState<any[]>([]);
+function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }: { onBack: () => void, session: Session, profile: Profile, initialData?: any, allowedPlaces?: any[] }) {
+  const [places, setPlaces] = useState<any[]>(allowedPlaces || []);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   
   const [name, setName] = useState(initialData?.name || ''); const [father, setFather] = useState(initialData?.father || '');
   const [surname, setSurname] = useState(initialData?.surname || ''); const [mobile, setMobile] = useState(initialData?.mobile || '');
   
-  // Force place_id if Counter
-  const initialPlaceId = (profile.role === 'counter' && profile.duty_place) ? profile.duty_place : (initialData?.place_id || null);
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialPlaceId);
+  // Logic for default selected place
+  let defaultPlace = initialData?.place_id || null;
+  if (!defaultPlace && profile.role === 'counter' && allowedPlaces && allowedPlaces.length === 1) {
+      defaultPlace = allowedPlaces[0].id;
+  }
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(defaultPlace);
   
   const [meals, setMeals] = useState<any[]>(initialData?.meals || []);
   const [showMealBuilder, setShowMealBuilder] = useState(false);
@@ -739,9 +1083,14 @@ function BookingScreen({ onBack, session, profile, initialData }: { onBack: () =
   useEffect(() => {
     async function fetchData() {
       if (!supabase) return;
-      const { data: pData } = await supabase.from('places').select('*').eq('is_active', true);
+      if (!allowedPlaces) {
+          const { data: pData } = await supabase.from('places').select('*').eq('is_active', true);
+          if (pData) setPlaces(pData.map(p => ({ label: p.name, value: p.id })));
+      } else {
+          setPlaces(allowedPlaces.map(p => ({ label: p.name || p.label, value: p.id || p.value })));
+      }
+      
       const { data: mData } = await supabase.from('menu_items').select('*').eq('is_active', true);
-      if (pData) setPlaces(pData.map(p => ({ label: p.name, value: p.id })));
       if (mData) setMenuItems(mData);
     }
     fetchData();
@@ -760,13 +1109,14 @@ function BookingScreen({ onBack, session, profile, initialData }: { onBack: () =
 
   async function handleSaveBooking() {
     if (!name || !mobile || meals.length === 0) return Alert.alert('અધૂરી માહિતી', 'નામ, નંબર અને 1 જમણવાર જરૂરી છે.');
+    if (!selectedPlaceId) return Alert.alert('ભૂલ', 'બુકિંગ માટે સ્થળ પસંદ કરવું ફરજિયાત છે.');
     if (mobile.length !== 10) return Alert.alert('ભૂલ', 'મોબાઈલ નંબર 10 આંકડાનો હોવો જોઈએ.');
     if (!supabase) return;
 
     setSaving(true);
     try {
       const payload = {
-        name, father, surname, mobile, place_id: selectedPlaceId || null, 
+        name, father, surname, mobile, place_id: selectedPlaceId, 
         meals, rasoi_seva: 0, thakorji_seva: (parseInt(thakorjiSeva) || 0),
         receipt_no: receiptNo, payment_status: paymentStatus, grand_total: grandTotal, user_id: session.user.id
       };
@@ -776,8 +1126,6 @@ function BookingScreen({ onBack, session, profile, initialData }: { onBack: () =
       onBack();
     } catch (err: any) { Alert.alert('Error', err.message); } finally { setSaving(false); }
   }
-
-  const isCounter = profile.role === 'counter';
 
   return (
     <View style={s.p18}>
@@ -791,13 +1139,13 @@ function BookingScreen({ onBack, session, profile, initialData }: { onBack: () =
         <TextInput placeholder="અટક" style={s.input} value={surname} onChangeText={setSurname} />
         <TextInput placeholder="મોબાઇલ નંબર (૧૦ આંકડા)" style={s.input} keyboardType="phone-pad" maxLength={10} value={mobile} onChangeText={setMobile} />
         
-        {isCounter ? (
+        {places.length === 1 ? (
            <View style={{marginBottom: 14}}>
              <Text style={s.label}>બુકિંગ સ્થળ</Text>
-             <TextInput style={[s.input, {backgroundColor: '#f1f5f9', color: '#64748b'}]} value={places.find(p=>p.value===selectedPlaceId)?.label || 'Unknown'} editable={false} />
+             <TextInput style={[s.input, {backgroundColor: '#f1f5f9', color: '#64748b'}]} value={places[0].label} editable={false} />
            </View>
         ) : (
-           <Dropdown label="સ્થળ" options={places} selectedValue={selectedPlaceId} onSelect={setSelectedPlaceId} placeholder="સ્થળ પસંદ કરો" />
+           <Dropdown label="સ્થળ પસંદ કરો" options={places} selectedValue={selectedPlaceId} onSelect={setSelectedPlaceId} placeholder="સ્થળ પસંદ કરો" />
         )}
 
         <Text style={[s.sectionTitle, {marginTop: 20}]}>2. જમણવાર અને મેનૂ</Text>
@@ -954,9 +1302,7 @@ function ProductionHome() {
   );
 }
 
-// ================= UTILITY COMPONENTS =================
-// Includes Dropdown, MealBuilderModal, BookingCard, Card, etc...
-// (Assuming these standard components remain at bottom without changes)
+// ================= UTILITY COMPONENTS (Complete without truncating) =================
 function DispatchHome() { return <View style={s.p18}><Text style={s.h1}>Dispatch Dashboard</Text></View>; }
 function Card({ title, icon, value }: any) { return <View style={s.card}><Text style={s.icon}>{icon}</Text><Text style={s.muted}>{title}</Text><Text style={s.value}>{value}</Text></View>; }
 function LoadingScreen() { return <SafeAreaView style={s.center}><ActivityIndicator size="large" color="#047857" /><Text style={{marginTop:10, color: '#64748b'}}>Loading...</Text></SafeAreaView>; }
@@ -984,7 +1330,7 @@ function BookingCard({ b, places, isAdmin, onEdit, onDelete }: any) {
   );
 }
 
-function Dropdown({ label, options, selectedValue, onSelect, placeholder }: any) {
+function Dropdown({ label, options, selectedValue, onSelect, placeholder, onAddNew }: any) {
   const [visible, setVisible] = useState(false);
   const selected = options.find((o: any) => o.value === selectedValue);
   return (
@@ -995,7 +1341,14 @@ function Dropdown({ label, options, selectedValue, onSelect, placeholder }: any)
         <View style={s.modalBg}>
           <View style={s.modalContent}>
             <Text style={s.modalTitle}>{label || 'પસંદ કરો'}</Text>
-            <ScrollView>{options.map((o: any) => (<Pressable key={o.value} style={s.modalItem} onPress={() => { onSelect(o.value); setVisible(false); }}><Text style={[s.modalItemText, selectedValue === o.value ? { color: '#047857', fontWeight: 'bold' } : null]}>{o.label}</Text></Pressable>))}</ScrollView>
+            <ScrollView>
+               {options.map((o: any) => (<Pressable key={o.value} style={s.modalItem} onPress={() => { onSelect(o.value); setVisible(false); }}><Text style={[s.modalItemText, selectedValue === o.value ? { color: '#047857', fontWeight: 'bold' } : null]}>{o.label}</Text></Pressable>))}
+               {onAddNew && (
+                  <Pressable style={s.modalItem} onPress={() => { setVisible(false); onAddNew(); }}>
+                     <Text style={{color: '#047857', fontWeight: '900'}}>＋ નવો પ્રકાર ઉમેરો</Text>
+                  </Pressable>
+               )}
+            </ScrollView>
             <Pressable onPress={() => setVisible(false)} style={s.closeButton}><Text style={s.closeText}>બંધ કરો</Text></Pressable>
           </View>
         </View>
@@ -1004,11 +1357,177 @@ function Dropdown({ label, options, selectedValue, onSelect, placeholder }: any)
   );
 }
 
-function DatePickerModal({ label, selectedDate, onSelect, placeholder }: any) { return <View />; } // (Maintained via previous snippet logic)
-function AlarmTimePicker({ label, selectedTime, onSelect, placeholder }: any) { return <View />; } // (Maintained via previous snippet logic)
-function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: any) { return <View />; } // (Maintained via previous snippet logic)
-function AdminMenuScreen({ onBack }: { onBack: () => void }) { return <View />; } // (Maintained via previous snippet logic)
-function AdminPlacesScreen({ onBack }: { onBack: () => void }) { return <View />; } // (Maintained via previous snippet logic)
+function DatePickerModal({ label, selectedDate, onSelect, placeholder }: any) {
+  const [visible, setVisible] = useState(false);
+  const [day, setDay] = useState(new Date().getDate());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [year, setYear] = useState(new Date().getFullYear());
+
+  useEffect(() => {
+    if (visible && selectedDate) {
+      const [d, m, y] = selectedDate.split('-');
+      if (d && m && y) { setDay(parseInt(d)); setMonth(parseInt(m)); setYear(parseInt(y)); }
+    }
+  }, [visible]);
+
+  function handleSave() { onSelect(`${day.toString().padStart(2, '0')}-${month.toString().padStart(2, '0')}-${year}`); setVisible(false); }
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      {label && <Text style={s.label}>{label}</Text>}
+      <Pressable onPress={() => setVisible(true)} style={[s.input, { marginBottom: 0 }]}><Text style={{ color: selectedDate ? '#1e293b' : '#9ca3af', fontSize: 16 }}>{selectedDate || placeholder}</Text></Pressable>
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={s.modalBg}>
+          <View style={[s.modalContent, {alignItems: 'center'}]}>
+            <Text style={s.modalTitle}>તારીખ પસંદ કરો</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 15, marginVertical: 20}}>
+              <View style={{alignItems: 'center'}}><Pressable onPress={()=>setDay(d=>d>=31?1:d+1)} style={s.arrowBtn}><Text style={s.arrowText}>▲</Text></Pressable><Text style={s.timeText}>{day.toString().padStart(2, '0')}</Text><Pressable onPress={()=>setDay(d=>d<=1?31:d-1)} style={s.arrowBtn}><Text style={s.arrowText}>▼</Text></Pressable></View>
+              <Text style={s.timeText}>/</Text>
+              <View style={{alignItems: 'center'}}><Pressable onPress={()=>setMonth(m=>m>=12?1:m+1)} style={s.arrowBtn}><Text style={s.arrowText}>▲</Text></Pressable><Text style={s.timeText}>{month.toString().padStart(2, '0')}</Text><Pressable onPress={()=>setMonth(m=>m<=1?12:m-1)} style={s.arrowBtn}><Text style={s.arrowText}>▼</Text></Pressable></View>
+              <Text style={s.timeText}>/</Text>
+              <View style={{alignItems: 'center'}}><Pressable onPress={()=>setYear(y=>y+1)} style={s.arrowBtn}><Text style={s.arrowText}>▲</Text></Pressable><Text style={[s.timeText, {width: 80}]}>{year}</Text><Pressable onPress={()=>setYear(y=>y-1)} style={s.arrowBtn}><Text style={s.arrowText}>▼</Text></Pressable></View>
+            </View>
+            <Pressable onPress={handleSave} style={[s.primary, {width: '100%'}]}><Text style={s.primaryText}>તારીખ સેવ કરો</Text></Pressable>
+            <Pressable onPress={() => setVisible(false)} style={[s.closeButton, {width: '100%'}]}><Text style={s.closeText}>બંધ કરો</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function AlarmTimePicker({ label, selectedTime, onSelect, placeholder }: any) {
+  const [visible, setVisible] = useState(false);
+  const [hour, setHour] = useState(10);
+  const [minute, setMinute] = useState(30);
+  const [ampm, setAmpm] = useState('AM');
+
+  useEffect(() => {
+    if (visible && selectedTime) {
+      const [hm, a] = selectedTime.split(' ');
+      const [h, m] = hm.split(':');
+      if (h && m && a) { setHour(parseInt(h)); setMinute(parseInt(m)); setAmpm(a); }
+    }
+  }, [visible]);
+
+  function handleSave() { onSelect(`${hour}:${minute.toString().padStart(2, '0')} ${ampm}`); setVisible(false); }
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      {label && <Text style={s.label}>{label}</Text>}
+      <Pressable onPress={() => setVisible(true)} style={[s.input, { marginBottom: 0 }]}><Text style={{ color: selectedTime ? '#1e293b' : '#9ca3af', fontSize: 16 }}>{selectedTime || placeholder}</Text></Pressable>
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={s.modalBg}>
+          <View style={[s.modalContent, {alignItems: 'center'}]}>
+            <Text style={s.modalTitle}>સમય સેટ કરો</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 20, marginVertical: 20}}>
+              <View style={{alignItems: 'center'}}><Pressable onPress={()=>setHour(h=>h===12?1:h+1)} style={s.arrowBtn}><Text style={s.arrowText}>▲</Text></Pressable><Text style={s.timeText}>{hour}</Text><Pressable onPress={()=>setHour(h=>h===1?12:h-1)} style={s.arrowBtn}><Text style={s.arrowText}>▼</Text></Pressable></View>
+              <Text style={s.timeText}>:</Text>
+              <View style={{alignItems: 'center'}}><Pressable onPress={()=>setMinute(m=>m>=55?0:m+5)} style={s.arrowBtn}><Text style={s.arrowText}>▲</Text></Pressable><Text style={s.timeText}>{minute.toString().padStart(2, '0')}</Text><Pressable onPress={()=>setMinute(m=>m<=0?55:m-5)} style={s.arrowBtn}><Text style={s.arrowText}>▼</Text></Pressable></View>
+              <Pressable onPress={()=>setAmpm(a=>a==='AM'?'PM':'AM')} style={s.ampmBtn}><Text style={s.ampmText}>{ampm}</Text></Pressable>
+            </View>
+            <Pressable onPress={handleSave} style={[s.primary, {width: '100%'}]}><Text style={s.primaryText}>સમય સેવ કરો</Text></Pressable>
+            <Pressable onPress={() => setVisible(false)} style={[s.closeButton, {width: '100%'}]}><Text style={s.closeText}>બંધ કરો</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: any) {
+  const [date, setDate] = useState(''); const [time, setTime] = useState(''); const [guestsCount, setGuestsCount] = useState(''); 
+  const [mainType, setMainType] = useState('લંચ'); const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
+  const [calculatedTotal, setCalculatedTotal] = useState<number | null>(null); const [mealNote, setMealNote] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (visible) {
+      setSearchQuery(''); setExpandedSubs({});
+      if (initialData) {
+        setDate(initialData.date); setTime(initialData.time); setGuestsCount(initialData.guestsCount.toString());
+        setMainType(initialData.mainType); setMealNote(initialData.note || ''); setCalculatedTotal(initialData.ratePerPlate);
+        const itemsMap: any = {}; initialData.items.forEach((i:any) => itemsMap[i.id] = true); setSelectedItems(itemsMap);
+      } else {
+        setDate(''); setTime(''); setGuestsCount(''); setMainType('લંચ'); setSelectedItems({}); setCalculatedTotal(null); setMealNote('');
+      }
+    }
+  }, [visible, initialData]);
+
+  if (!visible) return null;
+
+  const toggleItem = (id: string) => setSelectedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleSub = (sub: string) => setExpandedSubs(prev => ({...prev, [sub]: !prev[sub]}));
+
+  const filteredMenu = menuItems.filter((m:any) => m.is_active && m.main_type === mainType && m.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  function calculatePrice() {
+    let total = 0;
+    menuItems.forEach((item:any) => { if (selectedItems[item.id]) total += item.price; });
+    setCalculatedTotal(total);
+  }
+
+  function handleSave() {
+    if (!date || !time || !guestsCount) return Alert.alert('Error', 'તારીખ, સમય અને લોકોની સંખ્યા લખવી જરૂરી છે');
+    if (calculatedTotal === null) return Alert.alert('Error', 'પહેલા મેનૂનો ભાવ ગણો');
+    const itemsList = menuItems.filter((m:any) => selectedItems[m.id]);
+    onSave({ date, time, guestsCount: parseInt(guestsCount) || 0, mainType, items: itemsList, ratePerPlate: calculatedTotal, note: mealNote });
+    onClose();
+  }
+
+  // Find dynamic subcategories available for this mainType
+  const availableSubs = Array.from(new Set(menuItems.filter((m:any)=>m.main_type === mainType).map((m:any)=>m.sub_category).filter(Boolean)));
+
+  return (
+    <Modal visible={visible} animationType="slide">
+      <SafeAreaView style={{flex:1, backgroundColor:'#f8fafc'}}>
+        <View style={[s.header, {paddingTop: Platform.OS === 'web' ? 20 : 0}]}><Text style={s.h1}>{initialData ? 'જમણવાર એડિટ કરો' : 'નવો જમણવાર ઉમેરો'}</Text><Pressable onPress={onClose}><Text style={{fontSize:24, color: '#64748b'}}>✕</Text></Pressable></View>
+        <ScrollView contentContainerStyle={[s.webContainer, s.p18]}>
+          <View style={s.formCard}>
+            <DatePickerModal label="તારીખ પસંદ કરો" selectedDate={date} onSelect={setDate} placeholder="તારીખ પસંદ કરવા અહી ક્લિક કરો" />
+            <AlarmTimePicker label="જમવાનો સમય" selectedTime={time} onSelect={setTime} placeholder="સમય સેટ કરવા અહી ક્લિક કરો" />
+            <Text style={s.label}>આ જમણવાર માટે લોકોની સંખ્યા</Text>
+            <TextInput placeholder="દા.ત. 150" placeholderTextColor="#9ca3af" style={s.input} keyboardType="numeric" value={guestsCount} onChangeText={setGuestsCount} />
+            <Dropdown label="જમવાનો પ્રકાર" options={Array.from(new Set(menuItems.map(m=>m.main_type))).map(t => ({label: t, value: t}))} selectedValue={mainType} onSelect={setMainType} />
+            
+            <Text style={[s.sectionTitle, {marginTop: 15}]}>મેનૂ પસંદગી</Text>
+            <TextInput style={[s.input, {borderColor: '#047857', borderWidth: 2}]} placeholder="🔍 અહીં વાનગીનું નામ શોધો..." placeholderTextColor="#9ca3af" value={searchQuery} onChangeText={setSearchQuery} />
+
+            {availableSubs.map((sub: any) => {
+              const items = filteredMenu.filter((m:any) => m.sub_category === sub);
+              if (items.length === 0) return null;
+              const isExpanded = expandedSubs[sub] || searchQuery.length > 0;
+              return (
+                <View key={sub} style={{marginBottom: 10}}>
+                  <Pressable onPress={() => toggleSub(sub)} style={s.collapsibleHeader}>
+                     <Text style={s.collapsibleHeaderText}>{sub} ({items.length})</Text>
+                     <Text style={s.collapsibleHeaderIcon}>{isExpanded ? '▲' : '▼'}</Text>
+                  </Pressable>
+                  {isExpanded && (
+                    <View style={[s.chipContainer, {paddingTop: 10}]}>
+                      {items.map((item:any) => (
+                        <Pressable key={item.id} style={[s.chip, selectedItems[item.id] && s.chipSelected]} onPress={() => toggleItem(item.id)}>
+                          <Text style={[s.chipText, selectedItems[item.id] && s.chipTextSelected]}>{item.name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )
+            })}
+
+            <Text style={[s.label, {marginTop: 10}]}>આ જમણવાર માટે ખાસ નોંધ</Text>
+            <TextInput placeholder="દા.ત. જમવામાં તીખું ઓછું રાખવું..." placeholderTextColor="#9ca3af" style={[s.input, {height: 70, textAlignVertical: 'top'}]} multiline value={mealNote} onChangeText={setMealNote} />
+
+            <Pressable onPress={calculatePrice} style={[s.primary, {backgroundColor:'#0284c7', marginTop: 20}]}><Text style={s.primaryText}>મેનૂનો ભાવ ગણો</Text></Pressable>
+            {calculatedTotal !== null && <View style={s.autoRateBox}><Text style={s.autoRateLabel}>૧ ડિશનો ફિક્સ ભાવ:</Text><Text style={s.autoRateValue}>₹ {calculatedTotal}</Text></View>}
+            <Pressable onPress={handleSave} style={[s.saveBtn, {marginTop: 20}]}><Text style={s.saveBtnText}>{initialData ? 'ફેરફાર સેવ કરો' : 'આ જમણવાર સેવ કરો'}</Text></Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
 
 const s = StyleSheet.create({
   safe:{flex:1,backgroundColor:'#f8fafc'}, webContainer: { maxWidth: 1200, width: '100%', alignSelf: 'center' }, p18: { padding: 18 }, 
@@ -1044,5 +1563,8 @@ const s = StyleSheet.create({
   bookingCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.04, elevation:2 },
   mealBox: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, marginTop: 10, borderWidth: 1, borderColor: '#e2e8f0' },
   statusBadgeText: { backgroundColor: '#f0fdf4', color: '#047857', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: 'bold', fontSize: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#bbf7d0' },
-  totalBox: { backgroundColor: '#fefce8', padding: 16, borderRadius: 12, marginTop: 15, alignItems: 'flex-end', borderWidth: 1, borderColor: '#fde047' }, grandTotal: { fontSize: 22, fontWeight: '900', color: '#854d0e' }, saveBtn: { backgroundColor: '#d97706', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20, shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.1, elevation:2 }, saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' }
+  totalBox: { backgroundColor: '#fefce8', padding: 16, borderRadius: 12, marginTop: 15, alignItems: 'flex-end', borderWidth: 1, borderColor: '#fde047' }, grandTotal: { fontSize: 22, fontWeight: '900', color: '#854d0e' }, saveBtn: { backgroundColor: '#d97706', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20, shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.1, elevation:2 }, saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  arrowBtn: { padding: 10, backgroundColor: '#f1f5f9', borderRadius: 10 }, arrowText: { fontSize: 20, color: '#475569' }, timeText: { fontSize: 28, fontWeight: 'bold', marginVertical: 10, width: 50, textAlign: 'center', color: '#1e293b' }, ampmBtn: { backgroundColor: '#047857', paddingVertical: 14, paddingHorizontal: 18, borderRadius: 10, marginLeft: 10 }, ampmText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  mainTypeHeader: { fontSize: 20, fontWeight: '900', color: '#047857', borderBottomWidth: 2, borderBottomColor: '#047857', paddingBottom: 6, marginBottom: 12, marginTop: 10 }, collapsibleHeader: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }, collapsibleHeaderText: { fontSize: 16, fontWeight: 'bold', color: '#1e3a8a' }, collapsibleHeaderIcon: { fontSize: 14, color: '#1e3a8a', fontWeight: 'bold' }, chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 4, marginBottom: 15 }, chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 25, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }, chipSelected: { backgroundColor: '#047857', borderColor: '#047857' }, chipText: { fontSize: 14, color: '#475569', fontWeight: '600' }, chipTextSelected: { color: '#ffffff' }, autoRateBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#f0fdf4', borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', marginTop: 15 }, autoRateLabel: { fontSize: 16, fontWeight: 'bold', color: '#166534' }, autoRateValue: { fontSize: 20, fontWeight: '900', color: '#047857' }
 });
+
