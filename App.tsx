@@ -154,14 +154,17 @@ function AdminHome({ session, profile }: { session: Session, profile: Profile })
           tRev += (b.grand_total || 0);
           if (b.meals) {
             b.meals.forEach((m: any) => {
-              const g = m.guestsCount || 0; const hostName = `${b.name || ''} ${b.surname || ''}`.trim() || 'અજ્ઞાત યજમાન';
+              const g = m.guestsCount || 0; 
+              const hostName = `${b.name || ''} ${b.middle_name || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ') || 'અજ્ઞાત યજમાન';
+              const mealLabel = m.mealCategory === 'ફરાળી' ? '(ફરાળી)' : '';
+              
               if (m.date === tStr) {
                 tData.total += g; if(!tData.mealMap[m.mainType]) tData.mealMap[m.mainType] = { count: 0, hosts: [] };
-                tData.mealMap[m.mainType].count += g; tData.mealMap[m.mainType].hosts.push(`${hostName} (${g} લોકો)`);
+                tData.mealMap[m.mainType].count += g; tData.mealMap[m.mainType].hosts.push(`${hostName} ${mealLabel} - ${g} લોકો`);
               }
               if (m.date === tomStr) {
                 tomData.total += g; if(!tomData.mealMap[m.mainType]) tomData.mealMap[m.mainType] = { count: 0, hosts: [] };
-                tomData.mealMap[m.mainType].count += g; tomData.mealMap[m.mainType].hosts.push(`${hostName} (${g} લોકો)`);
+                tomData.mealMap[m.mainType].count += g; tomData.mealMap[m.mainType].hosts.push(`${hostName} ${mealLabel} - ${g} લોકો`);
               }
             });
           }
@@ -220,7 +223,6 @@ function AdminHome({ session, profile }: { session: Session, profile: Profile })
 
       <Pressable onPress={() => setActiveTab('today')} style={[s.primary, {backgroundColor: '#047857', paddingVertical: 18, marginBottom: 12, marginTop: 10}]}><Text style={{color:'#fff', fontWeight:'900', textAlign: 'center', fontSize: 17}}>📅 આજનો સંપૂર્ણ રિપોર્ટ (Today's Report)</Text></Pressable>
       
-      {/* 1. Super Admin Booking Button */}
       {profile.role === 'super_admin' && (
          <Pressable onPress={() => setActiveTab('new_booking')} style={[s.primary, {marginBottom: 12, paddingVertical: 18}]}><Text style={{color:'#fff', fontWeight:'900', textAlign: 'center', fontSize: 17}}>＋ નવી બુકિંગ બનાવો</Text></Pressable>
       )}
@@ -230,7 +232,6 @@ function AdminHome({ session, profile }: { session: Session, profile: Profile })
   ); 
 }
 
-// Reusable Preview Widget
 function PreviewWidget({ title, dateStr, data, bgColor, borderColor, sortOrder }: any) {
   const sortedKeys = Object.keys(data.mealMap).sort((a,b) => {
      let idxA = sortOrder.indexOf(a); let idxB = sortOrder.indexOf(b);
@@ -288,7 +289,6 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
       }
 
       const { data, error } = await supabase.from('bookings').select('*');
-      const { data: pData } = await supabase.from('places').select('*');
       if (error) throw error;
 
       if (data) {
@@ -299,14 +299,18 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
               if (m.date === todayStr) {
                 const gCount = m.guestsCount || 0;
                 tGuests += gCount; tRevenue += (m.ratePerPlate * gCount);
-                if (!mBreakdown[m.mainType]) mBreakdown[m.mainType] = 0;
-                mBreakdown[m.mainType] += gCount;
-                if (!agg[m.mainType]) agg[m.mainType] = {};
+                
+                // ફરાળી માટે રસોડાના રિપોર્ટમાં અલગ કેટેગરી બનાવીશું
+                const mType = m.mealCategory === 'ફરાળી' ? `${m.mainType} (ફરાળી)` : m.mainType;
+                
+                if (!mBreakdown[mType]) mBreakdown[mType] = 0;
+                mBreakdown[mType] += gCount;
+                if (!agg[mType]) agg[mType] = {};
                 m.items?.forEach((i: any) => {
                   const sub = i.sub_category || 'અન્ય';
-                  if (!agg[m.mainType][sub]) agg[m.mainType][sub] = {};
-                  if (!agg[m.mainType][sub][i.name]) agg[m.mainType][sub][i.name] = 0;
-                  agg[m.mainType][sub][i.name] += gCount; 
+                  if (!agg[mType][sub]) agg[mType][sub] = {};
+                  if (!agg[mType][sub][i.name]) agg[mType][sub][i.name] = 0;
+                  agg[mType][sub][i.name] += gCount; 
                 });
               }
             });
@@ -346,8 +350,8 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
             {Object.keys(menuAggregates).length === 0 ? ( <Text style={s.muted}>આજે કોઈ જમણવાર નથી.</Text> ) : (
               <ScrollView style={{maxHeight: Platform.OS === 'web' ? 500 : undefined}}>
                 {Object.keys(menuAggregates).map(type => (
-                  <View key={type} style={{marginBottom: 15, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
-                    <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>{type} ({mealBreakdown[type] || 0} લોકો)</Text>
+                  <View key={type} style={{marginBottom: 15, backgroundColor: type.includes('ફરાળી') ? '#fff7ed' : '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: type.includes('ફરાળી') ? '#fdba74' : '#e2e8f0'}}>
+                    <Text style={{fontSize: 16, fontWeight: 'bold', color: type.includes('ફરાળી') ? '#c2410c' : '#1e293b', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>{type} ({mealBreakdown[type] || 0} લોકો)</Text>
                     {Object.keys(menuAggregates[type]).sort((a,b)=> dynamicSubs.indexOf(a) - dynamicSubs.indexOf(b)).map(sub => (
                       <View key={sub} style={{marginBottom: 10}}><Text style={{fontSize: 14, fontWeight: 'bold', color: '#b91c1c', marginBottom: 6}}>{sub}</Text>
                         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
@@ -368,7 +372,7 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN MENU SCREEN (SMART TAP & SWAP ANIMATED) =================
+// ================= ADMIN MENU SCREEN =================
 function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(''); const [mainType, setMainType] = useState(''); const [subCategory, setSubCategory] = useState(''); const [price, setPrice] = useState(''); 
   const [menuItems, setMenuItems] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
@@ -379,7 +383,6 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [searchQuery, setSearchQuery] = useState(''); const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({});
   const [showCatManager, setShowCatManager] = useState(false); const [savingSort, setSavingSort] = useState(false);
 
-  // Smart Select States
   const [selectedMainIdx, setSelectedMainIdx] = useState<number | null>(null);
   const [selectedSubIdx, setSelectedSubIdx] = useState<number | null>(null);
 
@@ -392,15 +395,10 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
       setMenuItems(data);
       const mSorted = [...data].sort((a,b)=> (a.main_sort ?? 99) - (b.main_sort ?? 99));
       const sSorted = [...data].sort((a,b)=> (a.sub_sort ?? 99) - (b.sub_sort ?? 99));
-      
       const mains = Array.from(new Set(mSorted.map(d=>d.main_type).filter(Boolean)));
       const subs = Array.from(new Set(sSorted.map(d=>d.sub_category).filter(Boolean)));
-      
-      const finalMains = mains.length > 0 ? mains : BASE_MAIN_TYPES;
-      const finalSubs = subs.length > 0 ? subs : BASE_SUB_TYPES;
-      
-      setDynamicMainTypes(finalMains); setDynamicSubTypes(finalSubs);
-      if (!name && !editingId) { setMainType(finalMains[0] || 'લંચ'); setSubCategory(finalSubs[0] || 'રોટલી'); }
+      setDynamicMainTypes(mains.length > 0 ? mains : BASE_MAIN_TYPES); setDynamicSubTypes(subs.length > 0 ? subs : BASE_SUB_TYPES);
+      if (!name && !editingId) { setMainType(mains[0] || 'લંચ'); setSubCategory(subs[0] || 'રોટલી'); }
     }
   }
 
@@ -418,53 +416,27 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   }
 
   const handleMainTap = (idx: number) => {
-    if (selectedMainIdx === null) {
-      setSelectedMainIdx(idx); 
-    } else if (selectedMainIdx === idx) {
-      setSelectedMainIdx(null); 
-    } else {
+    if (selectedMainIdx === null) { setSelectedMainIdx(idx); } else if (selectedMainIdx === idx) { setSelectedMainIdx(null); } else {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      const newList = [...dynamicMainTypes];
-      const temp = newList[selectedMainIdx];
-      newList[selectedMainIdx] = newList[idx];
-      newList[idx] = temp;
-      setDynamicMainTypes(newList);
-      setSelectedMainIdx(null); 
+      const newList = [...dynamicMainTypes]; const temp = newList[selectedMainIdx]; newList[selectedMainIdx] = newList[idx]; newList[idx] = temp;
+      setDynamicMainTypes(newList); setSelectedMainIdx(null); 
     }
   };
 
   const handleSubTap = (idx: number) => {
-    if (selectedSubIdx === null) {
-      setSelectedSubIdx(idx); 
-    } else if (selectedSubIdx === idx) {
-      setSelectedSubIdx(null); 
-    } else {
+    if (selectedSubIdx === null) { setSelectedSubIdx(idx); } else if (selectedSubIdx === idx) { setSelectedSubIdx(null); } else {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      const newList = [...dynamicSubTypes];
-      const temp = newList[selectedSubIdx];
-      newList[selectedSubIdx] = newList[idx];
-      newList[idx] = temp;
-      setDynamicSubTypes(newList);
-      setSelectedSubIdx(null);
+      const newList = [...dynamicSubTypes]; const temp = newList[selectedSubIdx]; newList[selectedSubIdx] = newList[idx]; newList[idx] = temp;
+      setDynamicSubTypes(newList); setSelectedSubIdx(null);
     }
   };
 
-  // 8. Fix: Sequential Saving to prevent Database Rate Limit Errors
   async function saveGlobalSortOrder() {
     if(!supabase) return; setSavingSort(true);
     try {
-      // વારાફરતી મુખ્ય કેટેગરી સેવ કરો
-      for (let i = 0; i < dynamicMainTypes.length; i++) {
-        await supabase!.from('menu_items').update({ main_sort: i }).eq('main_type', dynamicMainTypes[i]);
-      }
-      // વારાફરતી સબ કેટેગરી સેવ કરો
-      for (let i = 0; i < dynamicSubTypes.length; i++) {
-        await supabase!.from('menu_items').update({ sub_sort: i }).eq('sub_category', dynamicSubTypes[i]);
-      }
-
-      await fetchMenu();
-      setShowCatManager(false);
-      showMsg('સફળતા 🎉', 'ક્રમ ડેટાબેઝમાં કાયમી સેવ થઈ ગયો છે અને આખી એપમાં અપડેટ થઈ ગયો છે!');
+      for (let i = 0; i < dynamicMainTypes.length; i++) { await supabase!.from('menu_items').update({ main_sort: i }).eq('main_type', dynamicMainTypes[i]); }
+      for (let i = 0; i < dynamicSubTypes.length; i++) { await supabase!.from('menu_items').update({ sub_sort: i }).eq('sub_category', dynamicSubTypes[i]); }
+      await fetchMenu(); setShowCatManager(false); showMsg('સફળતા 🎉', 'ક્રમ ડેટાબેઝમાં કાયમી સેવ થઈ ગયો છે!');
     } catch (e: any) { showMsg('Error', e.message); } finally { setSavingSort(false); }
   }
 
@@ -483,7 +455,6 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
         <Text style={s.h1}>મેનૂ મેનેજમેન્ટ</Text>
         <Pressable onPress={()=>setShowCatManager(true)} style={[s.refreshBtn, {backgroundColor: '#1e293b'}]}><Text style={[s.refreshBtnText, {color: '#fff'}]}>⚙️ કેટેગરીનો ક્રમ બદલો (Sort)</Text></Pressable>
       </View>
-
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>{editingId ? 'વાનગી એડિટ કરો' : 'નવી વાનગી ઉમેરો'}</Text>
         <TextInput style={s.input} value={name} onChangeText={setName} placeholder="વાનગીનું નામ (દા.ત. રોટલી)" />
@@ -541,45 +512,32 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
         <SafeAreaView style={s.safe}>
            <View style={[s.header, {paddingTop: Platform.OS==='web'?20:0}]}><Text style={s.h1}>કેટેગરીનો ક્રમ બદલો</Text><Pressable onPress={()=>{setShowCatManager(false); setSelectedMainIdx(null); setSelectedSubIdx(null);}}><Text style={{fontSize:24, color:'#64748b'}}>✕</Text></Pressable></View>
            <ScrollView contentContainerStyle={[s.webContainer, s.p18]}>
-              
               <Text style={{textAlign: 'center', backgroundColor: '#e0f2fe', padding: 10, borderRadius: 10, color: '#0369a1', fontWeight: 'bold', marginBottom: 20}}>
                  💡 સ્માર્ટ સ્વેપ: જેનો ક્રમ બદલવો હોય તેના પર ૧ વાર ક્લિક કરો, અને પછી બીજી જગ્યાએ ક્લિક કરો એટલે જગ્યા બદલાઈ જશે. 
               </Text>
-
               <View style={s.formCard}>
                 <Text style={s.sectionTitle}>જમણવાર ના પ્રકાર</Text>
                 {dynamicMainTypes.map((t, idx) => (
-                  <Pressable 
-                     key={t} 
-                     onPress={() => handleMainTap(idx)}
-                     style={[s.dragItem, selectedMainIdx === idx && s.dragging]}
-                  >
+                  <Pressable key={t} onPress={() => handleMainTap(idx)} style={[s.dragItem, selectedMainIdx === idx && s.dragging]}>
                     <Text style={s.dragHandle}>{selectedMainIdx === idx ? '🔄' : '👆'}</Text>
                     <Text style={{fontSize:16, fontWeight:'bold', color: selectedMainIdx === idx ? '#0369a1' : '#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
                     {selectedMainIdx === idx && <Text style={{fontSize: 12, fontWeight: 'bold', color: '#047857'}}>અહીં મૂકવા બીજી જગ્યા પસંદ કરો</Text>}
                   </Pressable>
                 ))}
               </View>
-
               <View style={[s.formCard, {marginTop: 20}]}>
                 <Text style={s.sectionTitle}>વાનગી ના પ્રકાર</Text>
                 {dynamicSubTypes.map((t, idx) => (
-                  <Pressable 
-                     key={t} 
-                     onPress={() => handleSubTap(idx)}
-                     style={[s.dragItem, selectedSubIdx === idx && s.dragging]}
-                  >
+                  <Pressable key={t} onPress={() => handleSubTap(idx)} style={[s.dragItem, selectedSubIdx === idx && s.dragging]}>
                     <Text style={s.dragHandle}>{selectedSubIdx === idx ? '🔄' : '👆'}</Text>
                     <Text style={{fontSize:16, fontWeight:'bold', color: selectedSubIdx === idx ? '#0369a1' : '#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
                     {selectedSubIdx === idx && <Text style={{fontSize: 12, fontWeight: 'bold', color: '#047857'}}>અહીં મૂકવા બીજી જગ્યા પસંદ કરો</Text>}
                   </Pressable>
                 ))}
               </View>
-
               <Pressable disabled={savingSort} onPress={saveGlobalSortOrder} style={({pressed}) => [s.saveBtn, {marginTop: 30, paddingVertical: 20}, pressed && {opacity: 0.8}]}>
                  <Text style={{color: '#fff', fontSize: 18, fontWeight: '900'}}>{savingSort ? 'સેવ થઈ રહ્યું છે...' : '💾 ફાઇનલ ક્રમ સેવ કરો'}</Text>
               </Pressable>
-              
            </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -587,7 +545,6 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN PLACES & USERS (100% RESTORED) =================
 function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(''); const [places, setPlaces] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
   useEffect(() => { fetchPlaces(); }, []);
@@ -610,12 +567,9 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
 }
 
 function AdminUsersScreen({ onBack }: { onBack: () => void }) {
-  const [users, setUsers] = useState<any[]>([]); 
-  const [places, setPlaces] = useState<any[]>([]);
-  const [showForm, setShowForm] = useState(false); 
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [users, setUsers] = useState<any[]>([]); const [places, setPlaces] = useState<any[]>([]);
+  const [showForm, setShowForm] = useState(false); const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  
   const [name, setName] = useState(''); const [mobile, setMobile] = useState(''); const [role, setRole] = useState<Role>('counter');
   const [selectedDutyPlaces, setSelectedDutyPlaces] = useState<string[]>([]); 
   const [loginEmail, setLoginEmail] = useState(''); const [loginPass, setLoginPass] = useState('');
@@ -626,7 +580,6 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
     if (!supabase) return; 
     const { data: uData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
     const { data: pData } = await supabase.from('places').select('*').eq('is_active', true);
-    
     if (uData) {
        const mappedUsers = uData.map(u => {
           let pList: string[] = [];
@@ -645,9 +598,7 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setEditingId(u.id); setName(u.full_name || ''); setMobile(u.mobile || '');
     setRole(u.role); setSelectedDutyPlaces(u.duty_places || []); 
-    setLoginEmail(u.login_email || ''); 
-    // 3. Populate current saved password when editing
-    setLoginPass(u.login_pass || '');
+    setLoginEmail(u.login_email || ''); setLoginPass(u.login_pass || '');
     setShowForm(true);
   }
   
@@ -656,13 +607,9 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
     else { Alert.alert('કન્ફર્મ કરો', 'આ યુઝર કાઢી નાખવો છે?', [{text:'ના'}, {text:'હા', style: 'destructive', onPress:async ()=>{await supabase!.from('profiles').delete().eq('id', id); fetchData();}}]); } 
   }
   
-  // 2. Active/Deactive Toggle
   async function toggleStatus(id: string, currentStatus: boolean) {
      if(!supabase) return;
-     try {
-       await supabase.from('profiles').update({ is_active: !currentStatus }).eq('id', id);
-       fetchData();
-     } catch(e: any) { showMsg('Error', e.message); }
+     try { await supabase.from('profiles').update({ is_active: !currentStatus }).eq('id', id); fetchData(); } catch(e: any) { showMsg('Error', e.message); }
   }
   
   async function saveUser() {
@@ -747,7 +694,6 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
                 <View style={[s.statusBadge, {backgroundColor: u.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: u.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{u.is_active ? 'Active' : 'Inactive'}</Text></View>
                 <View style={{flexDirection: 'row', gap: 5}}>
                   <Pressable onPress={() => openEdit(u)} style={({pressed})=> [s.editBtn, pressed && {backgroundColor:'#f1f5f9'}]}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
-                  {/* 2. Restored Active/Deactive Button */}
                   <Pressable onPress={() => toggleStatus(u.id, u.is_active)} style={({pressed})=> [s.editBtn, pressed && {backgroundColor:'#f1f5f9'}]}><Text style={s.editBtnText}>{u.is_active ? 'બંધ' : 'ચાલુ'}</Text></Pressable>
                   <Pressable onPress={() => deleteUser(u.id)} style={({pressed})=> [s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}, pressed && {backgroundColor:'#fee2e2'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
                 </View>
@@ -787,9 +733,11 @@ function CounterHome({ session, profile }: { session: Session, profile: Profile 
           if (b.meals) {
             b.meals.forEach((m: any) => {
               const g = m.guestsCount || 0; totalAllGuests += g;
-              const hostName = `${b.name || ''}`.trim() || 'અજ્ઞાત યજમાન';
-              if (m.date === tStr) { tData.total += g; if(!tData.mealMap[m.mainType]) tData.mealMap[m.mainType] = { count: 0, hosts: [] }; tData.mealMap[m.mainType].count += g; tData.mealMap[m.mainType].hosts.push(`${hostName} (${g})`); }
-              if (m.date === tomStr) { tomData.total += g; if(!tomData.mealMap[m.mainType]) tomData.mealMap[m.mainType] = { count: 0, hosts: [] }; tomData.mealMap[m.mainType].count += g; tomData.mealMap[m.mainType].hosts.push(`${hostName} (${g})`); }
+              const hostName = `${b.name || ''} ${b.middle_name || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ') || 'અજ્ઞાત યજમાન';
+              const mealLabel = m.mealCategory === 'ફરાળી' ? '(ફરાળી)' : '';
+
+              if (m.date === tStr) { tData.total += g; if(!tData.mealMap[m.mainType]) tData.mealMap[m.mainType] = { count: 0, hosts: [] }; tData.mealMap[m.mainType].count += g; tData.mealMap[m.mainType].hosts.push(`${hostName} ${mealLabel} - (${g})`); }
+              if (m.date === tomStr) { tomData.total += g; if(!tomData.mealMap[m.mainType]) tomData.mealMap[m.mainType] = { count: 0, hosts: [] }; tomData.mealMap[m.mainType].count += g; tomData.mealMap[m.mainType].hosts.push(`${hostName} ${mealLabel} - (${g})`); }
             });
           }
         });
@@ -883,12 +831,16 @@ function ProductionHome() {
             b.meals.forEach((m: any) => {
               if (m.date === targetDateStr) {
                 const gCount = m.guestsCount || 0; tGuests += gCount;
-                if (!agg[pName][m.mainType]) agg[pName][m.mainType] = {};
+                
+                // રસોડામાં ફરાળી વાનગીઓનું લિસ્ટ અલગ દેખાય તે માટેનું લોજિક
+                const mType = m.mealCategory === 'ફરાળી' ? `${m.mainType} (ફરાળી)` : m.mainType;
+                
+                if (!agg[pName][mType]) agg[pName][mType] = {};
                 m.items?.forEach((i: any) => {
                   const sub = i.sub_category || 'અન્ય';
-                  if (!agg[pName][m.mainType][sub]) agg[pName][m.mainType][sub] = {};
-                  if (!agg[pName][m.mainType][sub][i.name]) agg[pName][m.mainType][sub][i.name] = 0;
-                  agg[pName][m.mainType][sub][i.name] += gCount; 
+                  if (!agg[pName][mType][sub]) agg[pName][mType][sub] = {};
+                  if (!agg[pName][mType][sub][i.name]) agg[pName][mType][sub][i.name] = 0;
+                  agg[pName][mType][sub][i.name] += gCount; 
                 });
               }
             });
@@ -917,9 +869,13 @@ function ProductionHome() {
             <View key={place} style={{backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 2, borderColor: '#047857', marginBottom: 15}}>
               <Text style={{fontSize: 22, fontWeight: '900', color: '#1e3a8a', backgroundColor: '#e0f2fe', padding: 10, borderRadius: 10, textAlign: 'center', marginBottom: 15}}>📍 {place}</Text>
               
-              {Object.keys(menuAggregates[place]).sort((a,b)=> { let iA = sortedMains.indexOf(a); let iB = sortedMains.indexOf(b); return (iA===-1?999:iA) - (iB===-1?999:iB); }).map(type => (
-                <View key={type} style={{marginBottom: 15, padding: 12, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0'}}>
-                  <Text style={{fontSize: 18, fontWeight: '900', color: '#047857', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>{type}</Text>
+              {Object.keys(menuAggregates[place]).sort((a,b)=> { 
+                 const baseA = a.replace(' (ફરાળી)', ''); const baseB = b.replace(' (ફરાળી)', '');
+                 let iA = sortedMains.indexOf(baseA); let iB = sortedMains.indexOf(baseB); 
+                 return (iA===-1?999:iA) - (iB===-1?999:iB); 
+              }).map(type => (
+                <View key={type} style={{marginBottom: 15, padding: 12, backgroundColor: type.includes('ફરાળી') ? '#fff7ed' : '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: type.includes('ફરાળી') ? '#fdba74' : '#e2e8f0'}}>
+                  <Text style={{fontSize: 18, fontWeight: '900', color: type.includes('ફરાળી') ? '#ea580c' : '#047857', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>{type}</Text>
                   
                   {Object.keys(menuAggregates[place][type]).sort((a,b)=> { let iA = sortedSubs.indexOf(a); let iB = sortedSubs.indexOf(b); return (iA===-1?999:iA) - (iB===-1?999:iB); }).map(sub => (
                     <View key={sub} style={{marginBottom: 10}}>
@@ -941,27 +897,26 @@ function ProductionHome() {
   );
 }
 
-// ================= BOOKING COMPONENTS & UTILS =================
+// ================= BOOKING COMPONENTS =================
 function BookingCard({ b, places, isAdmin, onEdit, fetchBookings }: any) {
   const placeName = places.find((p:any) => p.id === b.place_id)?.name || 'સ્થળ નથી';
-  
-  // 5. Booking Delete function
+  const fullName = `${b.name || ''} ${b.middle_name || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ');
+
   async function handleDelete() {
     if(Platform.OS==='web') { if(window.confirm('ખરેખર આ બુકિંગ કાઢી નાખવું છે?')){ await supabase!.from('bookings').delete().eq('id', b.id); if(fetchBookings) fetchBookings(); } }
     else { Alert.alert('કન્ફર્મ કરો', 'ખરેખર આ બુકિંગ કાઢી નાખવું છે?', [{text:'ના'}, {text:'હા, કાઢી નાખો', style: 'destructive', onPress:async ()=>{await supabase!.from('bookings').delete().eq('id', b.id); if(fetchBookings) fetchBookings(); }}]); }
   }
 
-  // 7. Professional WhatsApp Message Logic
   function sendWhatsApp() {
      if(!b.mobile) return showMsg('ભૂલ', 'મોબાઈલ નંબર નથી');
      let mealDetails = '';
      if (b.meals) {
         b.meals.forEach((m: any, idx: number) => {
-           mealDetails += `${idx + 1}. ${m.mainType} (${m.guestsCount} લોકો)\n  તારીખ: ${m.date}  |  સમય: ${m.time}\n  સ્થળ: ${placeName}\n\n`;
+           mealDetails += `${idx + 1}. ${m.mainType} ${m.mealCategory === 'ફરાળી' ? '(ફરાળી)' : ''} (${m.guestsCount} લોકો)\n  તારીખ: ${m.date}  |  સમય: ${m.time}\n  સ્થળ: ${placeName}\n\n`;
         });
      }
      
-     const message = `જય સ્વામિનારાયણ! 🙏\nBAPS રાજકોટ (રસોઈ સેવા વિભાગ) તરફથી આપનું બુકિંગ કન્ફર્મ થઈ ગયું છે.\n\nયજમાન: ${b.name} ${b.surname || ''}\nમોબાઈલ: ${b.mobile}\n\nજમણવારની વિગત:\n${mealDetails}નોંધ: BAPS સ્વામિનારાયણ મંદિરે પહોંચી ગેટ નંબર 8 થી પ્રવેશીને આપના વાહન સેલર પાર્કિંગમાં પાર્ક કરવા નમ્ર વિનંતી.`;
+     const message = `જય સ્વામિનારાયણ! 🙏\nBAPS રાજકોટ (રસોઈ સેવા વિભાગ) તરફથી આપનું બુકિંગ કન્ફર્મ થઈ ગયું છે.\n\nયજમાન: ${fullName}\nમોબાઈલ: ${b.mobile}\n\nજમણવારની વિગત:\n${mealDetails}નોંધ: BAPS સ્વામિનારાયણ મંદિરે પહોંચી ગેટ નંબર 8 થી પ્રવેશીને આપના વાહન સેલર પાર્કિંગમાં પાર્ક કરવા નમ્ર વિનંતી.`;
      const encodedMessage = encodeURIComponent(message);
      Linking.openURL(`https://wa.me/91${b.mobile}?text=${encodedMessage}`);
   }
@@ -970,11 +925,10 @@ function BookingCard({ b, places, isAdmin, onEdit, fetchBookings }: any) {
     <View style={s.bookingCard}>
       <View style={{flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 10, marginBottom: 10}}>
         <View style={{flex: 1}}>
-          <Text style={{fontWeight:'900', fontSize: 18, color: '#1e293b'}}>{b.name} {b.surname || ''}</Text>
+          <Text style={{fontWeight:'900', fontSize: 18, color: '#1e293b'}}>{fullName}</Text>
           {b.mobile ? ( 
              <View style={{flexDirection: 'row', gap: 15, alignItems: 'center', marginTop: 6}}>
                 <Pressable onPress={() => Linking.openURL(`tel:${b.mobile}`)}><Text style={{color: '#0284c7', fontWeight: 'bold', fontSize: 14, textDecorationLine: 'underline'}}>📞 {b.mobile}</Text></Pressable>
-                {/* 6. Restored WhatsApp Button */}
                 <Pressable onPress={sendWhatsApp} style={{backgroundColor: '#22c55e', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12}}><Text style={{color: '#fff', fontWeight: 'bold', fontSize: 12}}>💬 WhatsApp</Text></Pressable>
              </View>
           ) : null}
@@ -982,9 +936,9 @@ function BookingCard({ b, places, isAdmin, onEdit, fetchBookings }: any) {
         <View style={{alignItems: 'flex-end'}}><Text style={s.statusBadgeText}>{b.payment_status}</Text><Text style={{color: '#64748b', fontSize: 12, marginTop: 6, fontWeight: 'bold'}}>પહોંચ: {b.receipt_no || '-'}</Text></View>
       </View>
       {b.meals?.map((m: any, idx: number) => (
-        <View key={idx} style={s.mealBox}>
+        <View key={idx} style={[s.mealBox, m.mealCategory === 'ફરાળી' && {backgroundColor: '#fff7ed', borderColor: '#fdba74'}]}>
           <Text style={{fontWeight: 'bold', color: '#1e3a8a', fontSize: 14}}>🗓️ {m.date} • ⏰ {m.time}</Text>
-          <Text style={{fontWeight: '700', marginTop: 4, color: '#334155'}}>📍 {placeName} • {m.mainType} ({m.guestsCount} લોકો)</Text>
+          <Text style={{fontWeight: '700', marginTop: 4, color: '#334155'}}>📍 {placeName} • {m.mainType} <Text style={{color:'#ea580c'}}>{m.mealCategory === 'ફરાળી' ? '(ફરાળી)' : ''}</Text> ({m.guestsCount} લોકો)</Text>
           <Text style={{color: '#64748b', fontSize: 13, marginTop: 2}}>🍽️ {m.items?.map((i:any)=> i.name ? i.name : i).join(', ')}</Text>
         </View>
       ))}
@@ -1006,7 +960,12 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
   const [places, setPlaces] = useState<any[]>(allowedPlaces || []); 
   const [menuItems, setMenuItems] = useState<any[]>([]); 
   const [saving, setSaving] = useState(false);
+  
+  // 1. નવા ૩ ફીલ્ડ્સ નો ઉમેરો
   const [name, setName] = useState(initialData?.name || ''); 
+  const [middleName, setMiddleName] = useState(initialData?.middle_name || ''); 
+  const [surname, setSurname] = useState(initialData?.surname || ''); 
+  
   const [mobile, setMobile] = useState(initialData?.mobile || '');
   
   let defaultPlace = initialData?.place_id || null;
@@ -1017,7 +976,8 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
   const [showMealBuilder, setShowMealBuilder] = useState(false); 
   const [editingMealIndex, setEditingMealIndex] = useState<number | null>(null);
   
-  const [thakorjiSeva, setThakorjiSeva] = useState(initialData?.thakorji_seva?.toString() || '0'); 
+  // 3. ઠાકોરજી સેવા માટે ફ્રી ટેક્સ્ટ ઇનપુટ સ્ટેટ
+  const [thakorjiSeva, setThakorjiSeva] = useState(initialData?.thakorji_seva?.toString() || ''); 
   const [receiptNo, setReceiptNo] = useState(initialData?.receipt_no || '');
   const [paymentStatus, setPaymentStatus] = useState(initialData?.payment_status || 'પૂર્ણ સેવા'); 
 
@@ -1041,7 +1001,8 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
     if (!selectedPlaceId) return showMsg('ભૂલ', 'બુકિંગ માટે સ્થળ પસંદ કરવું ફરજિયાત છે.');
     if (!supabase) return; setSaving(true);
     try {
-      const payload = { name, mobile, place_id: selectedPlaceId, meals, thakorji_seva: (parseInt(thakorjiSeva) || 0), receipt_no: receiptNo, payment_status: paymentStatus, grand_total: grandTotal, user_id: session.user.id };
+      // ડેટાબેઝ સેવ પેલોડ
+      const payload = { name: name.trim(), middle_name: middleName.trim(), surname: surname.trim(), mobile, place_id: selectedPlaceId, meals, thakorji_seva: (parseInt(thakorjiSeva) || 0), receipt_no: receiptNo, payment_status: paymentStatus, grand_total: grandTotal, user_id: session.user.id };
       const res = initialData?.id ? await supabase.from('bookings').update(payload).eq('id', initialData.id) : await supabase.from('bookings').insert([payload]);
       if (res.error) throw res.error;
       showMsg('સફળતા 🎉', `બુકિંગ સેવ થઈ ગયું!`); onBack();
@@ -1056,14 +1017,18 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>1. યજમાનની વિગતો</Text>
         <TextInput placeholder="નામ" style={s.input} value={name} onChangeText={setName} />
-        <TextInput placeholder="મોબાઇલ નંબર (૧૦ આંકડા)" style={s.input} keyboardType="phone-pad" maxLength={10} value={mobile} onChangeText={setMobile} />
+        <TextInput placeholder="પિતા/પતિ નું નામ" style={s.input} value={middleName} onChangeText={setMiddleName} />
+        <TextInput placeholder="અટક" style={s.input} value={surname} onChangeText={setSurname} />
+
+        <TextInput placeholder="મોબાઇલ નંબર (૧૦ આંકડા)" style={[s.input, {marginTop: 10}]} keyboardType="phone-pad" maxLength={10} value={mobile} onChangeText={setMobile} />
+        
         {places.length === 1 ? <View style={{marginBottom: 14}}><Text style={s.label}>બુકિંગ સ્થળ</Text><TextInput style={[s.input, {backgroundColor: '#f1f5f9'}]} value={places[0].label} editable={false} /></View> : <Dropdown label="સ્થળ પસંદ કરો" options={places} selectedValue={selectedPlaceId} onSelect={setSelectedPlaceId} />}
         
         <Text style={[s.sectionTitle, {marginTop: 20}]}>2. જમણવાર અને મેનૂ</Text>
         {meals.map((meal, index) => (
-          <View key={index} style={s.mealBox}>
+          <View key={index} style={[s.mealBox, meal.mealCategory === 'ફરાળી' && {backgroundColor: '#fff7ed', borderColor: '#fdba74'}]}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{fontWeight:'bold', color:'#1e3a8a'}}>🗓️ {meal.date} • ⏰ {meal.time}</Text><Text>({meal.guestsCount} લોકો)</Text></View>
-            <Text style={{fontWeight:'bold', marginTop: 5}}>{meal.mainType}</Text>
+            <Text style={{fontWeight:'bold', marginTop: 5, color: meal.mealCategory === 'ફરાળી' ? '#ea580c' : '#1e293b'}}>{meal.mainType} {meal.mealCategory === 'ફરાળી' ? '(ફરાળી)' : ''}</Text>
             <View style={{flexDirection: 'row', gap: 10, marginTop: 12}}>
               <Pressable onPress={() => { setEditingMealIndex(index); setShowMealBuilder(true); }} style={[s.editBtn, {flex: 1, alignItems: 'center'}]}><Text>✏️ એડિટ</Text></Pressable>
               <Pressable onPress={() => setMeals(meals.filter((_, i) => i !== index))} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color: '#dc2626'}}>🗑️</Text></Pressable>
@@ -1072,10 +1037,22 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
         ))}
         <Pressable onPress={() => { setEditingMealIndex(null); setShowMealBuilder(true); }} style={[s.primary, {backgroundColor:'#ffffff', borderWidth: 2, borderColor:'#047857', borderStyle:'dashed'}]}><Text style={{color:'#047857', fontWeight:'bold'}}>＋ નવો જમણવાર ઉમેરો</Text></Pressable>
 
-        <Text style={[s.sectionTitle, {marginTop: 20}]}>3. અન્ય ફંડ અને સેવા (પેમેન્ટ)</Text>
-        <Dropdown label="ઠાકોરજી સેવા (₹)" options={[{label:'₹ 0', value:'0'}, {label:'₹ 5100', value:'5100'}, {label:'₹ 11000', value:'11000'}]} selectedValue={thakorjiSeva} onSelect={setThakorjiSeva} />
+        {/* 2. સેવા સેક્શન નામકરણ */}
+        <Text style={[s.sectionTitle, {marginTop: 20}]}>3. સેવા</Text>
+        
+        {/* 3. ઠાકોરજી સેવા ઇનપુટ */}
+        <Text style={s.label}>ઠાકોરજી સેવા (₹)</Text>
+        <TextInput placeholder="કોઈ સેવા રકમ લખો દા.ત. 5100" style={s.input} keyboardType="numeric" value={thakorjiSeva} onChangeText={setThakorjiSeva} />
+        
+        <Text style={s.label}>રસીદ / પહોંચ નંબર</Text>
         <TextInput placeholder="પહોંચ નંબર" style={s.input} value={receiptNo} onChangeText={setReceiptNo} />
-        <Dropdown label="સેવા સ્ટેટસ (Payment Status)" options={[{label:'પૂર્ણ સેવા (Full)', value:'પૂર્ણ સેવા'}, {label:'બાકી સેવા (Partial)', value:'બાકી સેવા'}]} selectedValue={paymentStatus} onSelect={setPaymentStatus} />
+        
+        {/* 4. સેવા સ્ટેટસ સિંગલ સિલેક્ટ બટન્સ */}
+        <Text style={s.label}>સેવા સ્ટેટસ (Payment Status)</Text>
+        <View style={{flexDirection: 'row', gap: 10, marginBottom: 14}}>
+           <Pressable onPress={() => setPaymentStatus('પૂર્ણ સેવા')} style={[s.chip, paymentStatus === 'પૂર્ણ સેવા' && s.chipSelected, {flex: 1, alignItems: 'center', paddingVertical: 14}]}><Text style={[s.chipText, paymentStatus === 'પૂર્ણ સેવા' && s.chipTextSelected, {fontSize: 16}]}>પૂર્ણ સેવા</Text></Pressable>
+           <Pressable onPress={() => setPaymentStatus('બાકી સેવા')} style={[s.chip, paymentStatus === 'બાકી સેવા' && {backgroundColor: '#dc2626', borderColor: '#dc2626'}, {flex: 1, alignItems: 'center', paddingVertical: 14}]}><Text style={[s.chipText, paymentStatus === 'બાકી સેવા' && s.chipTextSelected, {fontSize: 16}]}>બાકી સેવા</Text></Pressable>
+        </View>
         
         <View style={s.totalBox}>
           <Text style={s.grandTotal}>ફાઇનલ કુલ સેવા: ₹ {grandTotal.toLocaleString()}</Text>
@@ -1088,23 +1065,23 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
   );
 }
 
-// RESTORED 100%: MealBuilderModal and Date/Time Pickers
+// 5. રેગ્યુલર અને ફરાળી સાથેનું નવું MealBuilder
 function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: any) {
   const [date, setDate] = useState(''); const [time, setTime] = useState(''); const [guestsCount, setGuestsCount] = useState(''); 
   const [mainType, setMainType] = useState('લંચ'); const [selectedItems, setSelectedItems] = useState<any>({});
   const [calculatedTotal, setCalculatedTotal] = useState<number | null>(null);
+  const [mealCategory, setMealCategory] = useState('રેગ્યુલર');
 
   useEffect(() => {
     if (visible) {
-      if (initialData) { setDate(initialData.date); setTime(initialData.time); setGuestsCount(initialData.guestsCount.toString()); setMainType(initialData.mainType); setCalculatedTotal(initialData.ratePerPlate); const m: any = {}; initialData.items.forEach((i:any) => m[i.id || i] = true); setSelectedItems(m); } 
-      else { setDate(''); setTime(''); setGuestsCount(''); setMainType('લંચ'); setSelectedItems({}); setCalculatedTotal(null); }
+      if (initialData) { setDate(initialData.date); setTime(initialData.time); setGuestsCount(initialData.guestsCount.toString()); setMainType(initialData.mainType); setCalculatedTotal(initialData.ratePerPlate); setMealCategory(initialData.mealCategory || 'રેગ્યુલર'); const m: any = {}; initialData.items.forEach((i:any) => m[i.id || i] = true); setSelectedItems(m); } 
+      else { setDate(''); setTime(''); setGuestsCount(''); setMainType('લંચ'); setMealCategory('રેગ્યુલર'); setSelectedItems({}); setCalculatedTotal(null); }
     }
   }, [visible, initialData]);
 
   if (!visible) return null;
   const filteredMenu = menuItems.filter((m:any) => m.is_active && m.main_type === mainType);
   
-  // અહી કેટેગરીને (મિષ્ટાન્ન વગેરે) એડમિન પેનલના ક્રમ મુજબ પરફેક્ટ સોર્ટ કરવાનું લોજિક છે:
   const availableSubs = Array.from(new Set(filteredMenu.map((m:any)=>m.sub_category).filter(Boolean)));
   availableSubs.sort((a: any, b: any) => {
     const valA = filteredMenu.find((m:any) => m.sub_category === a)?.sub_sort ?? 99;
@@ -1115,7 +1092,7 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
   function handleSave() {
     if (!date || !time || !guestsCount) return showMsg('Error', 'તારીખ, સમય અને લોકોની સંખ્યા લખવી જરૂરી છે');
     if (calculatedTotal === null) return showMsg('Error', 'પહેલા મેનૂની સેવા ગણો');
-    onSave({ date, time, guestsCount: parseInt(guestsCount) || 0, mainType, items: menuItems.filter((m:any) => selectedItems[m.id]), ratePerPlate: calculatedTotal });
+    onSave({ date, time, guestsCount: parseInt(guestsCount) || 0, mainType, mealCategory, items: menuItems.filter((m:any) => selectedItems[m.id]), ratePerPlate: calculatedTotal });
   }
 
   return (
@@ -1128,7 +1105,15 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
             <AlarmTimePicker label="જમવાનો સમય" selectedTime={time} onSelect={setTime} />
             <TextInput placeholder="લોકોની સંખ્યા દા.ત. 150" style={s.input} keyboardType="numeric" value={guestsCount} onChangeText={setGuestsCount} />
             <Dropdown label="જમવાનો પ્રકાર" options={Array.from(new Set(menuItems.sort((a:any,b:any)=>(a.main_sort||99)-(b.main_sort||99)).map((m:any)=>m.main_type))).map(t => ({label: t, value: t}))} selectedValue={mainType} onSelect={setMainType} />
-            <Text style={[s.sectionTitle, {marginTop: 15}]}>મેનૂ પસંદગી</Text>
+            
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#e2e8f0'}}>
+               <Text style={[s.sectionTitle, {marginBottom: 0}]}>મેનૂ પસંદગી</Text>
+               <View style={{flexDirection: 'row', gap: 6}}>
+                 <Pressable onPress={()=>setMealCategory('રેગ્યુલર')} style={[s.chip, mealCategory === 'રેગ્યુલર' && s.chipSelected, {paddingVertical: 8, paddingHorizontal: 16}]}><Text style={[s.chipText, mealCategory === 'રેગ્યુલર' && s.chipTextSelected]}>રેગ્યુલર</Text></Pressable>
+                 <Pressable onPress={()=>setMealCategory('ફરાળી')} style={[s.chip, mealCategory === 'ફરાળી' && {backgroundColor: '#ea580c', borderColor: '#ea580c'}, {paddingVertical: 8, paddingHorizontal: 16}]}><Text style={[s.chipText, mealCategory === 'ફરાળી' && s.chipTextSelected]}>ફરાળી</Text></Pressable>
+               </View>
+            </View>
+
             {availableSubs.map((sub: any) => (
                <View key={sub} style={{marginBottom: 10}}>
                  <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e3a8a', marginBottom: 8}}>{sub}</Text>
@@ -1208,7 +1193,8 @@ const s = StyleSheet.create({
   todayGuestsCard: { borderRadius: 16, padding: 18, borderWidth: 1.5, marginVertical: 10 }, mealPill: { backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#a7f3d0', alignSelf: 'flex-start' },
   input:{backgroundColor:'#ffffff',borderWidth:1,borderColor:'#cbd5e1',borderRadius:10,padding:14,marginBottom:14,fontSize:16, color: '#1e293b'}, label:{fontWeight:'700',marginBottom:6, marginTop:4, color: '#334155', fontSize: 14}, 
   primary:{backgroundColor:'#047857',padding:16,borderRadius:12,alignItems:'center',marginVertical:6}, primaryText:{color:'#fff',fontSize:16,fontWeight:'800'}, 
-backButton: { alignSelf: 'flex-start', paddingVertical: 12, paddingHorizontal: 20, marginBottom: 18, backgroundColor: '#f1f5f9', borderRadius: 30, borderWidth: 1.5, borderColor: '#cbd5e1' }, backText: { fontSize: 16, fontWeight: '900', color: '#0f172a' },  formCard:{backgroundColor:'#ffffff',borderRadius:16,padding:20,marginTop:12,borderWidth:1,borderColor:'#e2e8f0'}, sectionTitle:{fontSize:18,fontWeight:'900',marginBottom:14, color: '#1e293b'}, 
+  backButton: { alignSelf: 'flex-start', paddingVertical: 12, paddingHorizontal: 20, marginBottom: 18, backgroundColor: '#f1f5f9', borderRadius: 30, borderWidth: 1.5, borderColor: '#cbd5e1' }, backText: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
+  formCard:{backgroundColor:'#ffffff',borderRadius:16,padding:20,marginTop:12,borderWidth:1,borderColor:'#e2e8f0'}, sectionTitle:{fontSize:18,fontWeight:'900',marginBottom:14, color: '#1e293b'}, 
   menuBtn: { backgroundColor: '#ffffff', padding: 18, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }, menuBtnText: { color: '#1e293b', fontSize: 16, fontWeight: 'bold' }, 
   listCard: { flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:16, backgroundColor:'#ffffff', marginBottom:10, borderRadius:12, borderWidth:1, borderColor:'#e2e8f0' }, 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }, editBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }, editBtnText: { fontWeight: 'bold', color: '#475569', fontSize: 13 }, 
@@ -1222,7 +1208,6 @@ backButton: { alignSelf: 'flex-start', paddingVertical: 12, paddingHorizontal: 2
   totalBox: { backgroundColor: '#fefce8', padding: 16, borderRadius: 12, marginTop: 15, alignItems: 'flex-end', borderWidth: 1, borderColor: '#fde047' }, grandTotal: { fontSize: 22, fontWeight: '900', color: '#854d0e' },
   arrowBtn: { padding: 10, backgroundColor: '#f1f5f9', borderRadius: 10 }, arrowText: { fontSize: 20, color: '#475569' }, timeText: { fontSize: 28, fontWeight: 'bold', marginVertical: 10, width: 50, textAlign: 'center', color: '#1e293b' }, ampmBtn: { backgroundColor: '#047857', paddingVertical: 14, paddingHorizontal: 18, borderRadius: 10, marginLeft: 10 }, ampmText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   autoRateBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#f0fdf4', borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', marginTop: 15 }, autoRateLabel: { fontSize: 16, fontWeight: 'bold', color: '#166534' }, autoRateValue: { fontSize: 20, fontWeight: '900', color: '#047857' },
-  // Smart Swap Styles
   dragItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' },
   dragHandle: { fontSize: 20, color: '#94a3b8', marginRight: 15, fontWeight: 'bold' },
   dragging: { backgroundColor: '#dbeafe', borderWidth: 1, borderColor: '#93c5fd', borderRadius: 8 }
