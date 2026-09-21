@@ -1,8 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, Platform, Linking, Image, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, Platform, Linking, Image, useWindowDimensions, LayoutAnimation, UIManager } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Role = 'admin' | 'counter' | 'production' | 'dispatch' | 'super_admin';
 type Profile = { id: string; full_name: string | null; mobile: string | null; role: Role; is_active: boolean; duty_places?: string[]; photo_url?: string; login_email?: string; login_pass?: string };
@@ -76,7 +81,7 @@ function LoginScreen() {
           <Text style={s.loginSub}>Rasoi Seva Management System</Text>
           <TextInput value={email} onChangeText={setEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" style={s.input} autoCapitalize="none" />
           <TextInput value={password} onChangeText={setPassword} placeholder="પાસવર્ડ" style={s.input} secureTextEntry onSubmitEditing={signIn} />
-          <Pressable disabled={submitting} onPress={signIn} style={s.primary}><Text style={s.primaryText}>{submitting ? 'લૉગ ઇન થઈ રહ્યું છે…' : 'Login'}</Text></Pressable>
+          <Pressable disabled={submitting} onPress={signIn} style={({pressed}) => [s.primary, pressed && {opacity:0.8}]}><Text style={s.primaryText}>{submitting ? 'લૉગ ઇન થઈ રહ્યું છે…' : 'Login'}</Text></Pressable>
         </View>
       </View>
     </SafeAreaView>
@@ -257,7 +262,6 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [mealBreakdown, setMealBreakdown] = useState<Record<string, number>>({});
   const [menuAggregates, setMenuAggregates] = useState<Record<string, Record<string, Record<string, number>>>>({});
-  const [dispatchSchedule, setDispatchSchedule] = useState<any[]>([]);
   const [dynamicSubs, setDynamicSubs] = useState<string[]>(BASE_SUB_TYPES);
   const todayStr = getTodayStr();
 
@@ -278,9 +282,8 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
       if (error) throw error;
 
       if (data) {
-        let tGuests = 0, tRevenue = 0; let agg: any = {}; let mBreakdown: any = {}; let tSchedule: any[] = [];
+        let tGuests = 0, tRevenue = 0; let agg: any = {}; let mBreakdown: any = {};
         data.forEach(b => {
-          let placeName = pData?.find((p:any) => p.id === b.place_id)?.name || 'સ્થળ નથી';
           if (b.meals) {
             b.meals.forEach((m: any) => {
               if (m.date === todayStr) {
@@ -295,25 +298,14 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
                   if (!agg[m.mainType][sub][i.name]) agg[m.mainType][sub][i.name] = 0;
                   agg[m.mainType][sub][i.name] += gCount; 
                 });
-                tSchedule.push({ bookingId: b.id, hostName: `${b.name} ${b.surname}`, mobile: b.mobile, time: m.time, timeValue: parseTimeForSort(m.time), placeName: placeName, mainType: m.mainType, guestsCount: gCount, items: getSortedItems(m.items || [], dynamicSubs).map((i:any)=>i.name), note: m.note });
               }
             });
           }
         });
-        tSchedule.sort((a, b) => a.timeValue - b.timeValue);
         setTotalGuests(tGuests); setTotalRevenue(tRevenue);
-        setMenuAggregates(agg); setMealBreakdown(mBreakdown); setDispatchSchedule(tSchedule);
+        setMenuAggregates(agg); setMealBreakdown(mBreakdown);
       }
     } catch (err: any) { showMsg('Error', err.message); } finally { setLoading(false); }
-  }
-
-  function getSortedItems(items: any[], dynamicSubs: string[]) {
-    return [...(items || [])].sort((a, b) => {
-      let indexA = dynamicSubs.indexOf(a.sub_category || 'સામાન્ય');
-      let indexB = dynamicSubs.indexOf(b.sub_category || 'સામાન્ય');
-      if (indexA === -1) indexA = 999; if (indexB === -1) indexB = 999;
-      return indexA - indexB;
-    });
   }
 
   function handlePrint() {
@@ -366,7 +358,7 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN MENU SCREEN (LIVE SWAP DRAG & DROP) =================
+// ================= ADMIN MENU SCREEN (SMART TAP & SWAP ANIMATED) =================
 function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(''); const [mainType, setMainType] = useState(''); const [subCategory, setSubCategory] = useState(''); const [price, setPrice] = useState(''); 
   const [menuItems, setMenuItems] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
@@ -377,9 +369,9 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [searchQuery, setSearchQuery] = useState(''); const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({});
   const [showCatManager, setShowCatManager] = useState(false); const [savingSort, setSavingSort] = useState(false);
 
-  // Live Drag & Drop Refs for extreme smoothness
-  const dragMainItem = useRef<number | null>(null);
-  const dragSubItem = useRef<number | null>(null);
+  // Smart Select States
+  const [selectedMainIdx, setSelectedMainIdx] = useState<number | null>(null);
+  const [selectedSubIdx, setSelectedSubIdx] = useState<number | null>(null);
 
   useEffect(() => { fetchMenu(); }, []);
 
@@ -412,29 +404,40 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
       if (editingId) await supabase.from('menu_items').update(payload).eq('id', editingId);
       else await supabase.from('menu_items').insert([payload]);
       setName(''); setPrice(''); setEditingId(null); fetchMenu(); showMsg('Success', 'વાનગી સફળતાપૂર્વક સેવ થઈ ગઈ!');
-    } catch (err: any) { showMsg('Error', err.message); }
+    } catch (err: any) { showMsg('Error', err.message); } finally { setSavingSort(false); }
   }
 
-  // --- Smooth Live Swap DND Logic ---
-  const handleMainDragEnter = (idx: number) => {
-    if (dragMainItem.current !== null && dragMainItem.current !== idx) {
+  // --- Smooth Animated Smart Swap ---
+  const handleMainTap = (idx: number) => {
+    if (selectedMainIdx === null) {
+      setSelectedMainIdx(idx); // First tap selects
+    } else if (selectedMainIdx === idx) {
+      setSelectedMainIdx(null); // Deselect if tapped again
+    } else {
+      // Second tap on different item -> ANIMATED SWAP
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const newList = [...dynamicMainTypes];
-      const dragged = newList[dragMainItem.current];
-      newList.splice(dragMainItem.current, 1);
-      newList.splice(idx, 0, dragged);
-      dragMainItem.current = idx;
+      const temp = newList[selectedMainIdx];
+      newList[selectedMainIdx] = newList[idx];
+      newList[idx] = temp;
       setDynamicMainTypes(newList);
+      setSelectedMainIdx(null); // Clear selection
     }
   };
 
-  const handleSubDragEnter = (idx: number) => {
-    if (dragSubItem.current !== null && dragSubItem.current !== idx) {
+  const handleSubTap = (idx: number) => {
+    if (selectedSubIdx === null) {
+      setSelectedSubIdx(idx); 
+    } else if (selectedSubIdx === idx) {
+      setSelectedSubIdx(null); 
+    } else {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const newList = [...dynamicSubTypes];
-      const dragged = newList[dragSubItem.current];
-      newList.splice(dragSubItem.current, 1);
-      newList.splice(idx, 0, dragged);
-      dragSubItem.current = idx;
+      const temp = newList[selectedSubIdx];
+      newList[selectedSubIdx] = newList[idx];
+      newList[idx] = temp;
       setDynamicSubTypes(newList);
+      setSelectedSubIdx(null);
     }
   };
 
@@ -446,9 +449,9 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
       dynamicSubTypes.forEach((catName, idx) => updates.push(supabase!.from('menu_items').update({ sub_sort: idx }).eq('sub_category', catName)));
       await Promise.all(updates);
       await fetchMenu();
-      setSavingSort(false); setShowCatManager(false);
+      setShowCatManager(false);
       showMsg('સફળતા 🎉', 'ક્રમ ડેટાબેઝમાં કાયમી સેવ થઈ ગયો છે અને આખી એપમાં અપડેટ થઈ ગયો છે!');
-    } catch (e: any) { setSavingSort(false); showMsg('Error', e.message); }
+    } catch (e: any) { showMsg('Error', e.message); } finally { setSavingSort(false); }
   }
 
   async function toggleStatus(id: string, current: boolean) { await supabase!.from('menu_items').update({ is_active: !current }).eq('id', id); fetchMenu(); }
@@ -492,7 +495,7 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
               const isExpanded = expandedSubs[`${type}_${sub}`] || searchQuery.length > 0;
               return (
                 <View key={sub} style={{marginLeft: 10, marginBottom: 10}}>
-                  <Pressable onPress={() => setExpandedSubs(p=>({...p, [`${type}_${sub}`]:!p[`${type}_${sub}`]}))} style={s.collapsibleHeader}>
+                  <Pressable onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpandedSubs(p=>({...p, [`${type}_${sub}`]:!p[`${type}_${sub}`]})) }} style={s.collapsibleHeader}>
                      <Text style={s.collapsibleHeaderText}>{sub} ({itemsInSub.length})</Text>
                      <Text style={s.collapsibleHeaderIcon}>{isExpanded ? '▲' : '▼'}</Text>
                   </Pressable>
@@ -520,54 +523,50 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
         );
       })}
 
-      {/* DRAG AND DROP MODAL */}
+      {/* SMART TAP & SWAP MODAL */}
       <Modal visible={showCatManager} animationType="slide">
         <SafeAreaView style={s.safe}>
-           <View style={[s.header, {paddingTop: Platform.OS==='web'?20:0}]}><Text style={s.h1}>કેટેગરીનો ક્રમ બદલો</Text><Pressable onPress={()=>setShowCatManager(false)}><Text style={{fontSize:24, color:'#64748b'}}>✕</Text></Pressable></View>
+           <View style={[s.header, {paddingTop: Platform.OS==='web'?20:0}]}><Text style={s.h1}>કેટેગરીનો ક્રમ બદલો</Text><Pressable onPress={()=>{setShowCatManager(false); setSelectedMainIdx(null); setSelectedSubIdx(null);}}><Text style={{fontSize:24, color:'#64748b'}}>✕</Text></Pressable></View>
            <ScrollView contentContainerStyle={[s.webContainer, s.p18]}>
+              
+              <Text style={{textAlign: 'center', backgroundColor: '#e0f2fe', padding: 10, borderRadius: 10, color: '#0369a1', fontWeight: 'bold', marginBottom: 20}}>
+                 💡 સ્માર્ટ સ્વેપ: જેનો ક્રમ બદલવો હોય તેના પર ૧ વાર ક્લિક કરો, અને પછી બીજી જગ્યાએ ક્લિક કરો એટલે જગ્યા બદલાઈ જશે. 
+              </Text>
+
               <View style={s.formCard}>
-                <Text style={s.sectionTitle}>જમણવાર ના પ્રકાર (માઉસથી પકડીને સીધું ખેંચો)</Text>
+                <Text style={s.sectionTitle}>જમણવાર ના પ્રકાર</Text>
                 {dynamicMainTypes.map((t, idx) => (
-                  <View 
+                  <Pressable 
                      key={t} 
-                     style={[s.dragItem, Platform.OS === 'web' && { transition: 'transform 0.2s ease-in-out' } as any]}
-                     //@ts-ignore 
-                     draggable={Platform.OS === 'web'}
-                     onDragStart={() => { dragMainItem.current = idx; }}
-                     onDragEnter={() => handleMainDragEnter(idx)}
-                     onDragOver={(e: any) => { if (Platform.OS === 'web') e.preventDefault(); }}
-                     onDragEnd={() => { dragMainItem.current = null; }}
+                     onPress={() => handleMainTap(idx)}
+                     style={[s.dragItem, selectedMainIdx === idx && s.dragging]}
                   >
-                    <Text style={s.dragHandle}>⠿</Text>
-                    <Text style={{fontSize:16, fontWeight:'bold', color:'#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
-                  </View>
+                    <Text style={s.dragHandle}>{selectedMainIdx === idx ? '🔄' : '👆'}</Text>
+                    <Text style={{fontSize:16, fontWeight:'bold', color: selectedMainIdx === idx ? '#0369a1' : '#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
+                    {selectedMainIdx === idx && <Text style={{fontSize: 12, fontWeight: 'bold', color: '#047857'}}>અહીં મૂકવા બીજી જગ્યા પસંદ કરો</Text>}
+                  </Pressable>
                 ))}
               </View>
 
               <View style={[s.formCard, {marginTop: 20}]}>
-                <Text style={s.sectionTitle}>વાનગી ના પ્રકાર (માઉસથી પકડીને સીધું ખેંચો)</Text>
+                <Text style={s.sectionTitle}>વાનગી ના પ્રકાર</Text>
                 {dynamicSubTypes.map((t, idx) => (
-                  <View 
+                  <Pressable 
                      key={t} 
-                     style={[s.dragItem, Platform.OS === 'web' && { transition: 'transform 0.2s ease-in-out' } as any]}
-                     //@ts-ignore 
-                     draggable={Platform.OS === 'web'}
-                     onDragStart={() => { dragSubItem.current = idx; }}
-                     onDragEnter={() => handleSubDragEnter(idx)}
-                     onDragOver={(e: any) => { if (Platform.OS === 'web') e.preventDefault(); }}
-                     onDragEnd={() => { dragSubItem.current = null; }}
+                     onPress={() => handleSubTap(idx)}
+                     style={[s.dragItem, selectedSubIdx === idx && s.dragging]}
                   >
-                    <Text style={s.dragHandle}>⠿</Text>
-                    <Text style={{fontSize:16, fontWeight:'bold', color:'#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
-                  </View>
+                    <Text style={s.dragHandle}>{selectedSubIdx === idx ? '🔄' : '👆'}</Text>
+                    <Text style={{fontSize:16, fontWeight:'bold', color: selectedSubIdx === idx ? '#0369a1' : '#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
+                    {selectedSubIdx === idx && <Text style={{fontSize: 12, fontWeight: 'bold', color: '#047857'}}>અહીં મૂકવા બીજી જગ્યા પસંદ કરો</Text>}
+                  </Pressable>
                 ))}
               </View>
 
-              <Pressable disabled={savingSort} onPress={saveGlobalSortOrder} style={[s.saveBtn, {marginTop: 30, paddingVertical: 20}]}>
+              <Pressable disabled={savingSort} onPress={saveGlobalSortOrder} style={({pressed}) => [s.saveBtn, {marginTop: 30, paddingVertical: 20}, pressed && {opacity: 0.8}]}>
                  <Text style={{color: '#fff', fontSize: 18, fontWeight: '900'}}>{savingSort ? 'સેવ થઈ રહ્યું છે...' : '💾 ફાઇનલ ક્રમ સેવ કરો'}</Text>
               </Pressable>
               
-              <Text style={{textAlign: 'center', marginTop: 15, color: '#64748b', fontSize: 14}}>નોંધ: સેવ કર્યા પછી આખી એપમાં (ડેશબોર્ડ, કાઉન્ટર, રસોડું) ક્રમ આપોઆપ બદલાઈ જશે.</Text>
            </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -630,6 +629,7 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
   }
 
   function openEdit(u: any) {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setEditingId(u.id); setName(u.full_name || ''); setMobile(u.mobile || '');
     setRole(u.role); setSelectedDutyPlaces(u.duty_places || []); 
     setLoginEmail(u.login_email || ''); setLoginPass('');
@@ -702,11 +702,11 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
           <TextInput style={s.input} value={loginEmail} onChangeText={setLoginEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" autoCapitalize="none" />
           <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder={editingId ? "નવો પાસવર્ડ (બદલવો હોય તો જ લખો)" : "લોગિન પાસવર્ડ"} onSubmitEditing={saveUser} returnKeyType="done" />
 
-          <Pressable disabled={saving} onPress={saveUser} style={[s.primary, saving && {opacity: 0.7}]}><Text style={s.primaryText}>{saving ? 'સેવ થઈ રહ્યું છે...' : 'યુઝર સેવ કરો (Enter)'}</Text></Pressable>
-          <Pressable disabled={saving} onPress={() => {setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
+          <Pressable disabled={saving} onPress={saveUser} style={({pressed}) => [s.primary, saving && {opacity: 0.7}, pressed && {opacity: 0.8}]}><Text style={s.primaryText}>{saving ? 'સેવ થઈ રહ્યું છે...' : 'યુઝર સેવ કરો (Enter)'}</Text></Pressable>
+          <Pressable disabled={saving} onPress={() => {LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
         </View>
       ) : (
-        <Pressable onPress={() => {setEditingId(null); setName(''); setMobile(''); setLoginEmail(''); setLoginPass(''); setSelectedDutyPlaces([]); setShowForm(true);}} style={[s.primary, {backgroundColor: '#4f46e5'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
+        <Pressable onPress={() => {LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setEditingId(null); setName(''); setMobile(''); setLoginEmail(''); setLoginPass(''); setSelectedDutyPlaces([]); setShowForm(true);}} style={({pressed}) => [s.primary, {backgroundColor: '#4f46e5'}, pressed && {opacity:0.8}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
       )}
 
       <Text style={[s.sectionTitle, {marginTop: 20}]}>સ્ટાફ લિસ્ટ</Text>
@@ -722,8 +722,8 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
               <View style={{alignItems: 'flex-end', gap: 6}}>
                 <View style={[s.statusBadge, {backgroundColor: u.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: u.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{u.is_active ? 'Active' : 'Inactive'}</Text></View>
                 <View style={{flexDirection: 'row', gap: 5}}>
-                  <Pressable onPress={() => openEdit(u)} style={s.editBtn}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
-                  <Pressable onPress={() => deleteUser(u.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
+                  <Pressable onPress={() => openEdit(u)} style={({pressed})=> [s.editBtn, pressed && {backgroundColor:'#f1f5f9'}]}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
+                  <Pressable onPress={() => deleteUser(u.id)} style={({pressed})=> [s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}, pressed && {backgroundColor:'#fee2e2'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
                 </View>
               </View>
             </View>
@@ -733,51 +733,111 @@ function AdminUsersScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= COUNTER & PRODUCTION =================
+// ================= COUNTER & ALL BOOKINGS (100% RESTORED BUG FIXES) =================
 function CounterHome({ session, profile }: { session: Session, profile: Profile }) {
-  const [activeTab, setActiveTab] = useState<'home'|'new_booking'>('home');
+  const [activeTab, setActiveTab] = useState<'home'|'new_booking'|'all_bookings'>('home');
+  const [stats, setStats] = useState({ count: 0, lifetimeGuests: 0 }); 
+  const [todaysMeals, setTodaysMeals] = useState<any[]>([]);
   const [todayData, setTodayData] = useState({ total: 0, mealMap: {} as any });
   const [tomorrowData, setTomorrowData] = useState({ total: 0, mealMap: {} as any });
   const [places, setPlaces] = useState<any[]>([]); const { sortedMains } = useSortedCategories();
+  const [refreshing, setRefreshing] = useState(false); const [editingBooking, setEditingBooking] = useState<any>(null);
+
+  const myDutyPlaces = profile.duty_places || [];
 
   useEffect(() => { if (activeTab === 'home') fetchDashboard(); }, [activeTab]);
 
   async function fetchDashboard() {
-    if (!supabase) return;
+    if (!supabase) return; setRefreshing(true);
     try {
       let query = supabase.from('bookings').select('*').order('created_at', { ascending: false });
-      if (profile.duty_places && profile.duty_places.length > 0) query = query.or(profile.duty_places.map(p => `place_id.eq.${p}`).join(','));
+      if (myDutyPlaces.length > 0) query = query.or(myDutyPlaces.map(p => `place_id.eq.${p}`).join(','));
       const { data } = await query; const { data: pData } = await supabase.from('places').select('*');
       if (data) {
+        let totalAllGuests = 0; 
         const tStr = getTodayStr(); const tomStr = getTomorrowStr();
         let tData = { total: 0, mealMap: {} as any }; let tomData = { total: 0, mealMap: {} as any };
         data.forEach(b => {
           if (b.meals) {
             b.meals.forEach((m: any) => {
-              const g = m.guestsCount || 0; const hostName = `${b.name || ''}`.trim() || 'અજ્ઞાત યજમાન';
+              const g = m.guestsCount || 0; totalAllGuests += g;
+              const hostName = `${b.name || ''}`.trim() || 'અજ્ઞાત યજમાન';
               if (m.date === tStr) { tData.total += g; if(!tData.mealMap[m.mainType]) tData.mealMap[m.mainType] = { count: 0, hosts: [] }; tData.mealMap[m.mainType].count += g; tData.mealMap[m.mainType].hosts.push(`${hostName} (${g})`); }
               if (m.date === tomStr) { tomData.total += g; if(!tomData.mealMap[m.mainType]) tomData.mealMap[m.mainType] = { count: 0, hosts: [] }; tomData.mealMap[m.mainType].count += g; tomData.mealMap[m.mainType].hosts.push(`${hostName} (${g})`); }
             });
           }
         });
+        setStats({ count: data.length, lifetimeGuests: totalAllGuests });
         setTodayData(tData); setTomorrowData(tomData);
+        setTodaysMeals(data.filter(b => b.meals?.some((m:any) => m.date === tStr))); 
       }
       if (pData) setPlaces(pData);
-    } catch (err: any) { showMsg('Error', err.message); }
+    } catch (err: any) { showMsg('Error', err.message); } finally { setRefreshing(false); }
   }
 
+  if (editingBooking) return <BookingScreen onBack={() => { setEditingBooking(null); fetchDashboard(); }} session={session} profile={profile} initialData={editingBooking} allowedPlaces={places.filter(p=>myDutyPlaces.includes(p.id))} />;
   if (activeTab === 'new_booking') return <BookingScreen onBack={() => {setActiveTab('home'); fetchDashboard();}} session={session} profile={profile} allowedPlaces={places.filter(p=>(profile.duty_places||[]).includes(p.id))} />;
+  if (activeTab === 'all_bookings') return <AllBookingsScreen onBack={() => {setActiveTab('home'); fetchDashboard();}} session={session} profile={profile} isAdmin={false} />;
 
   return (
     <View style={s.p18}>
-      <Text style={s.h1}>કેશ કાઉન્ટર</Text>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
+         <Text style={s.h1}>કેશ કાઉન્ટર ડેશબોર્ડ</Text>
+         <Pressable onPress={fetchDashboard} style={s.refreshBtn}><Text style={s.refreshBtnText}>{refreshing ? 'Loading...' : '🔄 રિફ્રેશ'}</Text></Pressable>
+      </View>
+      
+      {/* RESTORED: Lifetime Stats Boxes */}
+      <View style={s.grid}>
+        <Card title="તમારા સ્થળના કુલ બુકિંગ્સ" icon="📋" value={stats.count.toString()} />
+        <Card title="કુલ યજમાનોની સંખ્યા" icon="👥" value={stats.lifetimeGuests.toString()} />
+      </View>
+
       <PreviewWidget title="🍽️ આજના યજમાનો" dateStr={getTodayStr()} data={todayData} bgColor="#f0fdf4" borderColor="#6ee7b7" sortOrder={sortedMains} />
       <PreviewWidget title="🍽️ આવતીકાલના યજમાનો" dateStr={getTomorrowStr()} data={tomorrowData} bgColor="#fffbeb" borderColor="#fde047" sortOrder={sortedMains} />
-      <Pressable onPress={() => setActiveTab('new_booking')} style={[s.primary, {marginBottom: 20}]}><Text style={s.primaryText}>＋ નવી બુકિંગ બનાવો</Text></Pressable>
+      
+      <Pressable onPress={() => setActiveTab('new_booking')} style={({pressed}) => [s.primary, {marginBottom: 20}, pressed && {opacity: 0.8}]}><Text style={s.primaryText}>＋ નવી બુકિંગ બનાવો</Text></Pressable>
+
+      {/* RESTORED: Today's Bookings List & View All Button */}
+      <Text style={[s.sectionTitle, {marginTop: 10}]}>આજની તારીખના બુકિંગ્સ ({todaysMeals.length})</Text>
+      {todaysMeals.map(b => <BookingCard key={b.id} b={b} places={places} isAdmin={false} onEdit={setEditingBooking} /> )}
+      
+      <Pressable onPress={() => setActiveTab('all_bookings')} style={({pressed}) => [s.primary, {backgroundColor: '#ffffff', borderWidth: 2, borderColor:'#047857', borderStyle:'dashed', marginTop: 12}, pressed && {backgroundColor: '#f1f5f9'}]}><Text style={{color:'#047857', fontWeight:'bold', fontSize: 16}}>📋 બધા બુકિંગ્સ જુઓ (View All)</Text></Pressable>
+
     </View>
   );
 }
 
+// RESTORED: All Bookings Screen Full Logic
+function AllBookingsScreen({ onBack, session, profile, isAdmin }: { onBack: () => void, session: Session, profile: Profile, isAdmin: boolean }) {
+  const [bookings, setBookings] = useState<any[]>([]); const [places, setPlaces] = useState<any[]>([]);
+  const [editingBooking, setEditingBooking] = useState<any>(null);
+
+  useEffect(() => { fetchBookings(); }, []);
+  async function fetchBookings() {
+    if (!supabase) return;
+    try {
+      let query = supabase.from('bookings').select('*').order('created_at', { ascending: false });
+      if (profile.role === 'counter' && profile.duty_places && profile.duty_places.length > 0) query = query.or(profile.duty_places.map(p => `place_id.eq.${p}`).join(','));
+      const { data } = await query; const { data: pData } = await supabase.from('places').select('*');
+      if (data) setBookings(data.sort((a,b) => (b.meals?.[0]?.date?.split('-').reverse().join('') || '0').localeCompare(a.meals?.[0]?.date?.split('-').reverse().join('') || '0')));
+      if (pData) setPlaces(pData);
+    } catch(err: any) { showMsg('Fetch Error', err.message); }
+  }
+
+  const allowedPlaces = (profile.role === 'counter') ? places.filter(p=> (profile.duty_places || []).includes(p.id)) : places;
+  if (editingBooking) return <BookingScreen onBack={() => { setEditingBooking(null); fetchBookings(); }} session={session} profile={profile} initialData={editingBooking} allowedPlaces={allowedPlaces} />;
+
+  return (
+    <View style={s.p18}>
+      <Pressable onPress={onBack} style={s.backButton}><Text style={s.backText}>‹ પાછા ડેશબોર્ડ પર</Text></Pressable>
+      <Text style={s.h1}>બધા બુકિંગ્સ (Lifetime)</Text>
+      {bookings.length === 0 ? <Text style={s.muted}>કોઈ બુકિંગ નથી.</Text> : null}
+      {bookings.map(b => <BookingCard key={b.id} b={b} places={places} isAdmin={isAdmin} onEdit={setEditingBooking} />)}
+    </View>
+  );
+}
+
+// ================= PRODUCTION (રસોડું) MODULE =================
 function ProductionHome() {
   const [loading, setLoading] = useState(true); const [prodDate, setProdDate] = useState<'today'|'tomorrow'>('today'); 
   const [menuAggregates, setMenuAggregates] = useState<any>({}); const [totalGuests, setTotalGuests] = useState(0);
@@ -857,7 +917,33 @@ function ProductionHome() {
   );
 }
 
-// ================= BOOKING & OTHER UTILS =================
+// ================= BOOKING COMPONENTS & UTILS =================
+function BookingCard({ b, places, isAdmin, onEdit }: any) {
+  const placeName = places.find((p:any) => p.id === b.place_id)?.name || 'સ્થળ નથી';
+  return (
+    <View style={s.bookingCard}>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 10, marginBottom: 10}}>
+        <View style={{flex: 1}}>
+          <Text style={{fontWeight:'900', fontSize: 18, color: '#1e293b'}}>{b.name} {b.surname || ''}</Text>
+          {b.mobile ? ( <Pressable onPress={() => Linking.openURL(`tel:${b.mobile}`)} style={{marginTop: 4}}><Text style={{color: '#0284c7', fontWeight: 'bold', fontSize: 14, textDecorationLine: 'underline'}}>📞 {b.mobile}</Text></Pressable> ) : null}
+        </View>
+        <View style={{alignItems: 'flex-end'}}><Text style={s.statusBadgeText}>{b.payment_status}</Text><Text style={{color: '#64748b', fontSize: 12, marginTop: 6, fontWeight: 'bold'}}>પહોંચ: {b.receipt_no || '-'}</Text></View>
+      </View>
+      {b.meals?.map((m: any, idx: number) => (
+        <View key={idx} style={s.mealBox}>
+          <Text style={{fontWeight: 'bold', color: '#1e3a8a', fontSize: 14}}>🗓️ {m.date} • ⏰ {m.time}</Text>
+          <Text style={{fontWeight: '700', marginTop: 4, color: '#334155'}}>📍 {placeName} • {m.mainType} ({m.guestsCount} લોકો)</Text>
+          <Text style={{color: '#64748b', fontSize: 13, marginTop: 2}}>🍽️ {m.items?.map((i:any)=> i.name ? i.name : i).join(', ')}</Text>
+        </View>
+      ))}
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12}}>
+        <Text style={{color:'#d97706', fontWeight:'900', fontSize: 17}}>{isAdmin ? `💰 કુલ સેવા: ₹${b.grand_total?.toLocaleString()}` : ''}</Text>
+        <Pressable onPress={() => onEdit(b)} style={({pressed}) => [s.editBtn, pressed && {backgroundColor: '#f1f5f9'}]}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
+      </View>
+    </View>
+  );
+}
+
 function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }: { onBack: () => void, session: Session, profile: Profile, initialData?: any, allowedPlaces?: any[] }) {
   const [places, setPlaces] = useState<any[]>(allowedPlaces || []); const [saving, setSaving] = useState(false);
   const [name, setName] = useState(initialData?.name || ''); const [mobile, setMobile] = useState(initialData?.mobile || '');
@@ -879,7 +965,7 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
       if (res.error) throw res.error; showMsg('સફળતા 🎉', `બુકિંગ સેવ થઈ ગયું!`); onBack();
     } catch (err: any) { showMsg('Error', err.message); } finally { setSaving(false); }
   }
-  return (<View style={s.p18}><Pressable onPress={onBack} style={s.backButton}><Text style={s.backText}>‹ પાછા</Text></Pressable><Text style={s.h1}>{initialData ? 'બુકિંગ એડિટ' : 'નવી બુકિંગ'}</Text><View style={s.formCard}><TextInput placeholder="નામ" style={s.input} value={name} onChangeText={setName} /><TextInput placeholder="મોબાઇલ નંબર" style={s.input} keyboardType="phone-pad" value={mobile} onChangeText={setMobile} />{places.length === 1 ? <Text style={s.label}>સ્થળ: {places[0].label}</Text> : <Dropdown label="સ્થળ પસંદ કરો" options={places} selectedValue={selectedPlaceId} onSelect={setSelectedPlaceId} />}<Pressable disabled={saving} onPress={handleSaveBooking} style={s.saveBtn}><Text style={s.saveBtnText}>{saving ? 'Saving...' : 'બુકિંગ સેવ કરો'}</Text></Pressable></View></View>);
+  return (<View style={s.p18}><Pressable onPress={onBack} style={s.backButton}><Text style={s.backText}>‹ પાછા</Text></Pressable><Text style={s.h1}>{initialData ? 'બુકિંગ એડિટ' : 'નવી બુકિંગ'}</Text><View style={s.formCard}><TextInput placeholder="નામ" style={s.input} value={name} onChangeText={setName} /><TextInput placeholder="મોબાઇલ નંબર" style={s.input} keyboardType="phone-pad" value={mobile} onChangeText={setMobile} />{places.length === 1 ? <Text style={s.label}>સ્થળ: {places[0].label}</Text> : <Dropdown label="સ્થળ પસંદ કરો" options={places} selectedValue={selectedPlaceId} onSelect={setSelectedPlaceId} />}<Pressable disabled={saving} onPress={handleSaveBooking} style={({pressed})=>[s.saveBtn, pressed && {opacity: 0.8}]}><Text style={s.saveBtnText}>{saving ? 'Saving...' : 'બુકિંગ સેવ કરો'}</Text></Pressable></View></View>);
 }
 
 function Dropdown({ label, options, selectedValue, onSelect, placeholder, onAddNew }: any) {
@@ -892,7 +978,6 @@ function Dropdown({ label, options, selectedValue, onSelect, placeholder, onAddN
 function Card({ title, icon, value }: any) { return <View style={s.card}><Text style={s.icon}>{icon}</Text><Text style={s.muted}>{title}</Text><Text style={s.value}>{value}</Text></View>; }
 function LoadingScreen() { return <SafeAreaView style={s.center}><ActivityIndicator size="large" color="#047857" /><Text style={{marginTop:10, color: '#64748b'}}>Loading...</Text></SafeAreaView>; }
 function SetupScreen() { return <SafeAreaView style={s.center}><Text style={{color: '#dc2626'}}>Supabase config missing.</Text></SafeAreaView>; }
-
 
 // ================= STYLES =================
 const s = StyleSheet.create({
@@ -918,7 +1003,9 @@ const s = StyleSheet.create({
   prodTabBar: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 12, padding: 4, marginBottom: 15 }, prodTabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 8 }, prodTabBtnActive: { backgroundColor: '#ffffff' }, prodTabBtnText: { fontWeight: 'bold', color: '#64748b' }, prodTabBtnTextActive: { color: '#047857', fontWeight: '900' },
   saveBtn: { backgroundColor: '#d97706', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 }, saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' },
   mainTypeHeader: { fontSize: 20, fontWeight: '900', color: '#047857', borderBottomWidth: 2, borderBottomColor: '#047857', paddingBottom: 6, marginBottom: 12, marginTop: 10 }, collapsibleHeader: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }, collapsibleHeaderText: { fontSize: 16, fontWeight: 'bold', color: '#1e3a8a' }, collapsibleHeaderIcon: { fontSize: 14, color: '#1e3a8a', fontWeight: 'bold' }, chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 4, marginBottom: 15 }, chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 25, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }, chipSelected: { backgroundColor: '#047857', borderColor: '#047857' }, chipText: { fontSize: 14, color: '#475569', fontWeight: '600' }, chipTextSelected: { color: '#ffffff' },
-  // ડ્રેગ એન્ડ ડ્રોપ સ્ટાઈલ
-  dragItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee', cursor: 'grab' },
-  dragHandle: { fontSize: 24, color: '#94a3b8', marginRight: 15, fontWeight: 'bold', cursor: 'grab' }
+  bookingCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' }, mealBox: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, marginTop: 10, borderWidth: 1, borderColor: '#e2e8f0' }, statusBadgeText: { backgroundColor: '#f0fdf4', color: '#047857', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: 'bold', fontSize: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#bbf7d0' },
+  // Smart Swap Styles
+  dragItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' },
+  dragHandle: { fontSize: 20, color: '#94a3b8', marginRight: 15, fontWeight: 'bold' },
+  dragging: { backgroundColor: '#dbeafe', borderWidth: 1, borderColor: '#93c5fd', borderRadius: 8 }
 });
