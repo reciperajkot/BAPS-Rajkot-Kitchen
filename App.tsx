@@ -9,7 +9,6 @@ type Profile = { id: string; full_name: string | null; mobile: string | null; ro
 
 const roleLabel: Record<Role, string> = { admin: 'Admin', super_admin: 'Super Admin', counter: 'Cash Counter', production: 'Production (રસોડું)', dispatch: 'Dispatch' };
 
-// Fallback Types
 const BASE_MAIN_TYPES = ['નાસ્તો', 'મોર્નિંગ સ્નેક', 'લંચ', 'હાઈ ટી', 'ડિનર', 'નાઈટ સ્નેક'];
 const BASE_SUB_TYPES = ['મિષ્ટાન્ન', 'ફરસાણ', 'રોટલી', 'શાક', 'પનીર પંજાબી', 'વેજ. પંજાબી', 'કઠોળ', 'ભાત', 'દાળ', 'સલાડ', 'છાશ', 'મુખવાસ', 'લિક્વિડ', 'વિશેષ'];
 
@@ -249,7 +248,125 @@ function PreviewWidget({ title, dateStr, data, bgColor, borderColor, sortOrder }
   )
 }
 
-// ================= ADMIN MENU SCREEN (DRAG & DROP SORTING) =================
+// ================= TODAY'S REPORT (ADMIN) =================
+function TodayReportScreen({ onBack }: { onBack: () => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const [loading, setLoading] = useState(true);
+  const [totalGuests, setTotalGuests] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [mealBreakdown, setMealBreakdown] = useState<Record<string, number>>({});
+  const [menuAggregates, setMenuAggregates] = useState<Record<string, Record<string, Record<string, number>>>>({});
+  const [dispatchSchedule, setDispatchSchedule] = useState<any[]>([]);
+  const [dynamicSubs, setDynamicSubs] = useState<string[]>(BASE_SUB_TYPES);
+  const todayStr = getTodayStr();
+
+  useEffect(() => { fetchTodayData(); }, []);
+
+  async function fetchTodayData() {
+    setLoading(true);
+    if (!supabase) return;
+    try {
+      const { data: menuData } = await supabase.from('menu_items').select('*');
+      if (menuData) {
+        const sortedMenu = menuData.sort((a,b)=> (a.sub_sort || 99) - (b.sub_sort || 99));
+        setDynamicSubs(Array.from(new Set(sortedMenu.map(m=>m.sub_category).filter(Boolean))));
+      }
+
+      const { data, error } = await supabase.from('bookings').select('*');
+      const { data: pData } = await supabase.from('places').select('*');
+      if (error) throw error;
+
+      if (data) {
+        let tGuests = 0, tRevenue = 0; let agg: any = {}; let mBreakdown: any = {}; let tSchedule: any[] = [];
+        data.forEach(b => {
+          let placeName = pData?.find((p:any) => p.id === b.place_id)?.name || 'સ્થળ નથી';
+          if (b.meals) {
+            b.meals.forEach((m: any) => {
+              if (m.date === todayStr) {
+                const gCount = m.guestsCount || 0;
+                tGuests += gCount; tRevenue += (m.ratePerPlate * gCount);
+                if (!mBreakdown[m.mainType]) mBreakdown[m.mainType] = 0;
+                mBreakdown[m.mainType] += gCount;
+                if (!agg[m.mainType]) agg[m.mainType] = {};
+                m.items?.forEach((i: any) => {
+                  const sub = i.sub_category || 'અન્ય';
+                  if (!agg[m.mainType][sub]) agg[m.mainType][sub] = {};
+                  if (!agg[m.mainType][sub][i.name]) agg[m.mainType][sub][i.name] = 0;
+                  agg[m.mainType][sub][i.name] += gCount; 
+                });
+                tSchedule.push({ bookingId: b.id, hostName: `${b.name} ${b.surname}`, mobile: b.mobile, time: m.time, timeValue: parseTimeForSort(m.time), placeName: placeName, mainType: m.mainType, guestsCount: gCount, items: getSortedItems(m.items || [], dynamicSubs).map((i:any)=>i.name), note: m.note });
+              }
+            });
+          }
+        });
+        tSchedule.sort((a, b) => a.timeValue - b.timeValue);
+        setTotalGuests(tGuests); setTotalRevenue(tRevenue);
+        setMenuAggregates(agg); setMealBreakdown(mBreakdown); setDispatchSchedule(tSchedule);
+      }
+    } catch (err: any) { showMsg('Error', err.message); } finally { setLoading(false); }
+  }
+
+  function getSortedItems(items: any[], dynamicSubs: string[]) {
+    return [...(items || [])].sort((a, b) => {
+      let indexA = dynamicSubs.indexOf(a.sub_category || 'સામાન્ય');
+      let indexB = dynamicSubs.indexOf(b.sub_category || 'સામાન્ય');
+      if (indexA === -1) indexA = 999; if (indexB === -1) indexB = 999;
+      return indexA - indexB;
+    });
+  }
+
+  function handlePrint() {
+    if (Platform.OS === 'web') window.print();
+    else showMsg('પ્રિન્ટ', 'પ્રિન્ટ કરવા માટે કૃપા કરીને વેબ બ્રાઉઝરનો ઉપયોગ કરો.');
+  }
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <View style={s.p18}>
+      {Platform.OS === 'web' && ( <style>{`@media print { .no-print { display: none !important; } }`}</style> )}
+      <Pressable onPress={onBack} style={[s.backButton, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}><Text style={s.backText}>‹ પાછા ડેશબોર્ડ પર</Text></Pressable>
+      <View style={{flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 15, gap: isMobile ? 12 : 0}}>
+        <View><Text style={{fontSize: 26, fontWeight: '900', color: '#047857'}}>આજનો સંપૂર્ણ રિપોર્ટ</Text><Text style={{color: '#64748b', fontSize: 13, fontWeight: 'bold', marginTop: 2}}>{todayStr}</Text></View>
+        <View style={{flexDirection: 'row', gap: 8, width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end'}}>
+          <Pressable onPress={handlePrint} style={[s.refreshBtn, {backgroundColor: '#d97706', paddingHorizontal: 15, flex: isMobile ? 1 : undefined, alignItems: 'center'}, Platform.OS === 'web' ? {className: 'no-print'} as any : {}]}><Text style={{fontSize: 14, color: '#fff', fontWeight: 'bold'}}>🖨️ પ્રિન્ટ</Text></Pressable>
+        </View>
+      </View>
+      <View style={{flexDirection: Platform.OS === 'web' ? 'row' : 'column', gap: 15}}>
+        <View style={{flex: Platform.OS === 'web' ? 1 : undefined}}>
+          <View {...(Platform.OS === 'web' ? { className: 'no-print' } : {})} style={{backgroundColor: '#f0fdf4', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', marginBottom: 12}}>
+             <Text style={{color: '#166534', fontWeight: 'bold', fontSize: 13}}>આજની કુલ સેવા રકમ</Text>
+             <Text style={{fontSize: 30, fontWeight: '900', color: '#047857', marginVertical: 4}}>₹ {totalRevenue.toLocaleString()}</Text>
+             <Text style={{color: '#374151', fontWeight: '600'}}>કુલ મહેમાનો: {totalGuests} લોકો</Text>
+          </View>
+          <View style={{backgroundColor: '#fff', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0'}}>
+            <Text style={{fontSize: 18, fontWeight: '900', color: '#d97706', marginBottom: 12}}>👨‍🍳 રસોડા માટેનું લિસ્ટ</Text>
+            {Object.keys(menuAggregates).length === 0 ? ( <Text style={s.muted}>આજે કોઈ જમણવાર નથી.</Text> ) : (
+              <ScrollView style={{maxHeight: Platform.OS === 'web' ? 500 : undefined}}>
+                {Object.keys(menuAggregates).map(type => (
+                  <View key={type} style={{marginBottom: 15, backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0'}}>
+                    <Text style={{fontSize: 16, fontWeight: 'bold', color: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 6, marginBottom: 8}}>{type} ({mealBreakdown[type] || 0} લોકો)</Text>
+                    {Object.keys(menuAggregates[type]).sort((a,b)=> dynamicSubs.indexOf(a) - dynamicSubs.indexOf(b)).map(sub => (
+                      <View key={sub} style={{marginBottom: 10}}><Text style={{fontSize: 14, fontWeight: 'bold', color: '#b91c1c', marginBottom: 6}}>{sub}</Text>
+                        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+                          {Object.keys(menuAggregates[type][sub]).map(itemName => (
+                            <View key={itemName} style={{backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0'}}><Text style={{fontSize: 13, color: '#334155'}}><Text style={{fontWeight: 'bold', color: '#047857'}}>{itemName}</Text> ({menuAggregates[type][sub][itemName]} લોકો)</Text></View>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ================= ADMIN MENU SCREEN (LIVE SWAP DRAG & DROP) =================
 function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(''); const [mainType, setMainType] = useState(''); const [subCategory, setSubCategory] = useState(''); const [price, setPrice] = useState(''); 
   const [menuItems, setMenuItems] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
@@ -260,9 +377,9 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   const [searchQuery, setSearchQuery] = useState(''); const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({});
   const [showCatManager, setShowCatManager] = useState(false); const [savingSort, setSavingSort] = useState(false);
 
-  // Drag State for Web
-  const [draggedMainIdx, setDraggedMainIdx] = useState<number | null>(null);
-  const [draggedSubIdx, setDraggedSubIdx] = useState<number | null>(null);
+  // Live Drag & Drop Refs for extreme smoothness
+  const dragMainItem = useRef<number | null>(null);
+  const dragSubItem = useRef<number | null>(null);
 
   useEffect(() => { fetchMenu(); }, []);
 
@@ -288,11 +405,8 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   async function saveMenu() {
     if (!name.trim() || !price || !supabase) return showMsg('Error', 'વાનગીનું નામ અને સેવા રાશી લખો.');
     const mainSortVal = dynamicMainTypes.indexOf(mainType); const subSortVal = dynamicSubTypes.indexOf(subCategory);
-    
-    // Auto-fix 99 bug: Assign correct current max order if not found
     const finalMSort = mainSortVal > -1 ? mainSortVal : dynamicMainTypes.length;
     const finalSSort = subSortVal > -1 ? subSortVal : dynamicSubTypes.length;
-
     const payload = { name: name.trim(), main_type: mainType, sub_category: subCategory, price: parseFloat(price) || 0, is_active: true, main_sort: finalMSort, sub_sort: finalSSort };
     try {
       if (editingId) await supabase.from('menu_items').update(payload).eq('id', editingId);
@@ -301,44 +415,38 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
     } catch (err: any) { showMsg('Error', err.message); }
   }
 
-  // --- HTML5 Drag & Drop Logic for Web ---
-  const handleMainDrop = (dropIdx: number) => {
-    if (draggedMainIdx === null || draggedMainIdx === dropIdx) return;
-    const newList = [...dynamicMainTypes];
-    const [removed] = newList.splice(draggedMainIdx, 1);
-    newList.splice(dropIdx, 0, removed);
-    setDynamicMainTypes(newList);
-    setDraggedMainIdx(null);
+  // --- Smooth Live Swap DND Logic ---
+  const handleMainDragEnter = (idx: number) => {
+    if (dragMainItem.current !== null && dragMainItem.current !== idx) {
+      const newList = [...dynamicMainTypes];
+      const dragged = newList[dragMainItem.current];
+      newList.splice(dragMainItem.current, 1);
+      newList.splice(idx, 0, dragged);
+      dragMainItem.current = idx;
+      setDynamicMainTypes(newList);
+    }
   };
 
-  const handleSubDrop = (dropIdx: number) => {
-    if (draggedSubIdx === null || draggedSubIdx === dropIdx) return;
-    const newList = [...dynamicSubTypes];
-    const [removed] = newList.splice(draggedSubIdx, 1);
-    newList.splice(dropIdx, 0, removed);
-    setDynamicSubTypes(newList);
-    setDraggedSubIdx(null);
+  const handleSubDragEnter = (idx: number) => {
+    if (dragSubItem.current !== null && dragSubItem.current !== idx) {
+      const newList = [...dynamicSubTypes];
+      const dragged = newList[dragSubItem.current];
+      newList.splice(dragSubItem.current, 1);
+      newList.splice(idx, 0, dragged);
+      dragSubItem.current = idx;
+      setDynamicSubTypes(newList);
+    }
   };
 
-  // The Magic Save Button Logic
   async function saveGlobalSortOrder() {
-    if(!supabase) return;
-    setSavingSort(true);
+    if(!supabase) return; setSavingSort(true);
     try {
       const updates: Promise<any>[] = [];
-      // Update all main types across the entire menu table
-      dynamicMainTypes.forEach((catName, idx) => {
-        updates.push(supabase!.from('menu_items').update({ main_sort: idx }).eq('main_type', catName));
-      });
-      // Update all sub categories
-      dynamicSubTypes.forEach((catName, idx) => {
-        updates.push(supabase!.from('menu_items').update({ sub_sort: idx }).eq('sub_category', catName));
-      });
-      
+      dynamicMainTypes.forEach((catName, idx) => updates.push(supabase!.from('menu_items').update({ main_sort: idx }).eq('main_type', catName)));
+      dynamicSubTypes.forEach((catName, idx) => updates.push(supabase!.from('menu_items').update({ sub_sort: idx }).eq('sub_category', catName)));
       await Promise.all(updates);
       await fetchMenu();
-      setSavingSort(false);
-      setShowCatManager(false);
+      setSavingSort(false); setShowCatManager(false);
       showMsg('સફળતા 🎉', 'ક્રમ ડેટાબેઝમાં કાયમી સેવ થઈ ગયો છે અને આખી એપમાં અપડેટ થઈ ગયો છે!');
     } catch (e: any) { setSavingSort(false); showMsg('Error', e.message); }
   }
@@ -418,44 +526,45 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
            <View style={[s.header, {paddingTop: Platform.OS==='web'?20:0}]}><Text style={s.h1}>કેટેગરીનો ક્રમ બદલો</Text><Pressable onPress={()=>setShowCatManager(false)}><Text style={{fontSize:24, color:'#64748b'}}>✕</Text></Pressable></View>
            <ScrollView contentContainerStyle={[s.webContainer, s.p18]}>
               <View style={s.formCard}>
-                <Text style={s.sectionTitle}>જમણવાર ના પ્રકાર (માઉસથી પકડીને ઉપર-નીચે ખેંચો)</Text>
+                <Text style={s.sectionTitle}>જમણવાર ના પ્રકાર (માઉસથી પકડીને સીધું ખેંચો)</Text>
                 {dynamicMainTypes.map((t, idx) => (
                   <View 
                      key={t} 
-                     style={[s.dragItem, draggedMainIdx === idx && s.dragging]}
-                     //@ts-ignore (HTML5 native drag for web)
+                     style={[s.dragItem, Platform.OS === 'web' && { transition: 'transform 0.2s ease-in-out' } as any]}
+                     //@ts-ignore 
                      draggable={Platform.OS === 'web'}
-                     onDragStart={() => setDraggedMainIdx(idx)}
+                     onDragStart={() => { dragMainItem.current = idx; }}
+                     onDragEnter={() => handleMainDragEnter(idx)}
                      onDragOver={(e: any) => { if (Platform.OS === 'web') e.preventDefault(); }}
-                     onDrop={() => handleMainDrop(idx)}
+                     onDragEnd={() => { dragMainItem.current = null; }}
                   >
-                    <Text style={s.dragHandle}>☰</Text>
+                    <Text style={s.dragHandle}>⠿</Text>
                     <Text style={{fontSize:16, fontWeight:'bold', color:'#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
                   </View>
                 ))}
               </View>
 
               <View style={[s.formCard, {marginTop: 20}]}>
-                <Text style={s.sectionTitle}>વાનગી ના પ્રકાર (માઉસથી પકડીને ઉપર-નીચે ખેંચો)</Text>
+                <Text style={s.sectionTitle}>વાનગી ના પ્રકાર (માઉસથી પકડીને સીધું ખેંચો)</Text>
                 {dynamicSubTypes.map((t, idx) => (
                   <View 
                      key={t} 
-                     style={[s.dragItem, draggedSubIdx === idx && s.dragging]}
+                     style={[s.dragItem, Platform.OS === 'web' && { transition: 'transform 0.2s ease-in-out' } as any]}
                      //@ts-ignore 
                      draggable={Platform.OS === 'web'}
-                     onDragStart={() => setDraggedSubIdx(idx)}
+                     onDragStart={() => { dragSubItem.current = idx; }}
+                     onDragEnter={() => handleSubDragEnter(idx)}
                      onDragOver={(e: any) => { if (Platform.OS === 'web') e.preventDefault(); }}
-                     onDrop={() => handleSubDrop(idx)}
+                     onDragEnd={() => { dragSubItem.current = null; }}
                   >
-                    <Text style={s.dragHandle}>☰</Text>
+                    <Text style={s.dragHandle}>⠿</Text>
                     <Text style={{fontSize:16, fontWeight:'bold', color:'#1e293b', flex: 1}}>{idx + 1}. {t}</Text>
                   </View>
                 ))}
               </View>
 
-              {/* MAGIC SAVE BUTTON */}
               <Pressable disabled={savingSort} onPress={saveGlobalSortOrder} style={[s.saveBtn, {marginTop: 30, paddingVertical: 20}]}>
-                 <Text style={{color: '#fff', fontSize: 18, fontWeight: '900'}}>{savingSort ? 'સેવ થઈ રહ્યું છે...' : '💾 ફાઇનલ ક્રમ સેવ કરો (Global Update)'}</Text>
+                 <Text style={{color: '#fff', fontSize: 18, fontWeight: '900'}}>{savingSort ? 'સેવ થઈ રહ્યું છે...' : '💾 ફાઇનલ ક્રમ સેવ કરો'}</Text>
               </Pressable>
               
               <Text style={{textAlign: 'center', marginTop: 15, color: '#64748b', fontSize: 14}}>નોંધ: સેવ કર્યા પછી આખી એપમાં (ડેશબોર્ડ, કાઉન્ટર, રસોડું) ક્રમ આપોઆપ બદલાઈ જશે.</Text>
@@ -466,7 +575,7 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN PLACES & USERS =================
+// ================= ADMIN PLACES & USERS (100% RESTORED) =================
 function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(''); const [places, setPlaces] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
   useEffect(() => { fetchPlaces(); }, []);
@@ -489,54 +598,142 @@ function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
 }
 
 function AdminUsersScreen({ onBack }: { onBack: () => void }) {
-  const [users, setUsers] = useState<any[]>([]); const [places, setPlaces] = useState<any[]>([]); const [showForm, setShowForm] = useState(false); const [editingId, setEditingId] = useState<string | null>(null); const [saving, setSaving] = useState(false);
-  const [name, setName] = useState(''); const [role, setRole] = useState<Role>('counter'); const [selectedDutyPlaces, setSelectedDutyPlaces] = useState<string[]>([]); const [loginEmail, setLoginEmail] = useState(''); const [loginPass, setLoginPass] = useState('');
+  const [users, setUsers] = useState<any[]>([]); 
+  const [places, setPlaces] = useState<any[]>([]);
+  const [showForm, setShowForm] = useState(false); 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  
+  const [name, setName] = useState(''); const [mobile, setMobile] = useState(''); const [role, setRole] = useState<Role>('counter');
+  const [selectedDutyPlaces, setSelectedDutyPlaces] = useState<string[]>([]); 
+  const [loginEmail, setLoginEmail] = useState(''); const [loginPass, setLoginPass] = useState('');
+
   useEffect(() => { fetchData(); }, []);
+  
   async function fetchData() { 
     if (!supabase) return; 
-    const { data: uData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); const { data: pData } = await supabase.from('places').select('*').eq('is_active', true);
-    if (uData) setUsers(uData.map(u => ({...u, duty_places: Array.isArray(u.duty_places) ? u.duty_places : (typeof u.duty_places === 'string' ? JSON.parse(u.duty_places||'[]') : [u.duty_place])})));
+    const { data: uData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
+    const { data: pData } = await supabase.from('places').select('*').eq('is_active', true);
+    
+    if (uData) {
+       const mappedUsers = uData.map(u => {
+          let pList: string[] = [];
+          if (u.duty_places) {
+             if(Array.isArray(u.duty_places)) pList = u.duty_places;
+             else if(typeof u.duty_places === 'string') { try { pList = JSON.parse(u.duty_places); } catch(e) { pList = [u.duty_places]; } }
+          } else if (u.duty_place) { pList = [u.duty_place]; }
+          return {...u, duty_places: pList};
+       });
+       setUsers(mappedUsers); 
+    }
     if (pData) setPlaces(pData);
   }
+
+  function openEdit(u: any) {
+    setEditingId(u.id); setName(u.full_name || ''); setMobile(u.mobile || '');
+    setRole(u.role); setSelectedDutyPlaces(u.duty_places || []); 
+    setLoginEmail(u.login_email || ''); setLoginPass('');
+    setShowForm(true);
+  }
+  
+  async function deleteUser(id: string) { 
+    if(Platform.OS==='web') { if(window.confirm('આ યુઝર કાઢી નાખવો છે?')){ await supabase!.from('profiles').delete().eq('id', id); fetchData();} } 
+    else { Alert.alert('કન્ફર્મ કરો', 'આ યુઝર કાઢી નાખવો છે?', [{text:'ના'}, {text:'હા', style: 'destructive', onPress:async ()=>{await supabase!.from('profiles').delete().eq('id', id); fetchData();}}]); } 
+  }
+  
   async function saveUser() {
     if (!name || !loginEmail || (!loginPass && !editingId)) return showMsg('ભૂલ ❌', 'નામ, યુઝર ID અને પાસવર્ડ ફરજિયાત છે.');
-    if (!supabase) return; setSaving(true);
+    if (role === 'counter' && selectedDutyPlaces.length === 0) return showMsg('ભૂલ ❌', 'કેશ કાઉન્ટર માટે ઓછામાં ઓછું એક સ્થળ પસંદ કરવું ફરજિયાત છે.');
+    if (!supabase) return;
+    
+    setSaving(true);
     const authEmail = loginEmail.includes('@') ? loginEmail.toLowerCase() : `${loginEmail.toLowerCase()}@baps.local`;
-    const payload: any = { full_name: name, role, duty_places: selectedDutyPlaces, login_email: loginEmail, is_active: true };
+    const payload: any = { full_name: name, mobile, role, duty_places: selectedDutyPlaces, login_email: loginEmail, is_active: true };
+    
     if (editingId) {
       if (loginPass) payload.login_pass = loginPass;
-      await supabase.from('profiles').update(payload).eq('id', editingId); setSaving(false); showMsg('સફળતા 🎉', 'યુઝર અપડેટ થઈ ગયો!'); setShowForm(false); setEditingId(null); fetchData(); 
+      const { error } = await supabase.from('profiles').update(payload).eq('id', editingId);
+      setSaving(false);
+      if(error) showMsg('ભૂલ ❌', error.message);
+      else { showMsg('સફળતા 🎉', 'યુઝરની ડિટેલ અપડેટ થઈ ગઈ!'); setShowForm(false); setEditingId(null); fetchData(); }
     } else {
       try {
-        const { data } = await supabase.auth.getSession(); const token = data?.session?.access_token;
-        const res = await fetch('https://ooeecqioprwverlpdjqe.supabase.co/functions/v1/create-auth-user', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ email: authEmail, password: loginPass, full_name: name, role }) });
-        const result = await res.json(); if (!res.ok) throw new Error(result.error);
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) { setSaving(false); return showMsg('સેશન એક્સપાયર', 'લૉગિન સેશન પૂરું થઈ ગયું છે, ફરીથી લૉગિન કરો.'); }
+        const response = await fetch('https://ooeecqioprwverlpdjqe.supabase.co/functions/v1/create-auth-user', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ email: authEmail, password: loginPass, full_name: name, mobile: mobile || "", role: role })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'યુઝર બનાવવામાં ભૂલ આવી');
         await supabase.from('profiles').update({ duty_places: selectedDutyPlaces, login_email: loginEmail }).eq('id', result.user.id);
-        setSaving(false); showMsg('સફળતા 🎉', 'નવો યુઝર બની ગયો!'); setShowForm(false); setEditingId(null); fetchData();
+        setSaving(false); showMsg('સફળતા 🎉', 'નવો યુઝર સફળતાપૂર્વક બની ગયો!'); setShowForm(false); setEditingId(null); fetchData();
       } catch (err: any) { setSaving(false); showMsg('ભૂલ ❌', err.message); }
     }
   }
+
+  function togglePlaceSelection(placeId: string) {
+    if (selectedDutyPlaces.includes(placeId)) setSelectedDutyPlaces(selectedDutyPlaces.filter(id => id !== placeId));
+    else setSelectedDutyPlaces([...selectedDutyPlaces, placeId]);
+  }
+
   return (
     <View style={s.p18}>
       <Pressable onPress={onBack} style={s.backButton}><Text style={s.backText}>‹ પાછા સેટિંગ્સ પર</Text></Pressable>
       <Text style={s.h1}>યુઝર મેનેજમેન્ટ</Text>
+      
       {showForm ? (
         <View style={s.formCard}>
+          <Text style={s.sectionTitle}>{editingId ? 'યુઝર એડિટ કરો' : 'નવો યુઝર ઉમેરો'}</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder="યુઝરનું નામ" />
-          <Dropdown label="રોલ (Role)" options={[{label:'Super Admin', value:'super_admin'}, {label:'Admin', value:'admin'}, {label:'Cash Counter', value:'counter'}, {label:'Production (રસોડું)', value:'production'}]} selectedValue={role} onSelect={setRole} />
-          <View style={s.chipContainer}>{places.map(p => { const isSel = selectedDutyPlaces.includes(p.id); return <Pressable key={p.id} onPress={() => setSelectedDutyPlaces(isSel ? selectedDutyPlaces.filter(id => id !== p.id) : [...selectedDutyPlaces, p.id])} style={[s.chip, isSel && s.chipSelected]}><Text style={[s.chipText, isSel && s.chipTextSelected]}>{p.name}</Text></Pressable> })}</View>
+          <TextInput style={s.input} value={mobile} onChangeText={setMobile} placeholder="મોબાઈલ નંબર" keyboardType="phone-pad" />
+          <Dropdown label="રોલ (Role)" options={[{label:'Super Admin', value:'super_admin'}, {label:'Admin', value:'admin'}, {label:'Cash Counter', value:'counter'}, {label:'Production (રસોડું)', value:'production'}, {label:'Dispatch', value:'dispatch'}]} selectedValue={role} onSelect={setRole} />
+          
+          <Text style={s.label}>આ યુઝર માટે કયા સ્થળ માન્ય છે? (એકથી વધુ સિલેક્ટ કરી શકાય)</Text>
+          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 15, padding: 10, backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0'}}>
+             {places.map(p => {
+                 const isSelected = selectedDutyPlaces.includes(p.id);
+                 return ( <Pressable key={p.id} onPress={() => togglePlaceSelection(p.id)} style={[s.chip, isSelected && s.chipSelected]}><Text style={[s.chipText, isSelected && s.chipTextSelected]}>{p.name}</Text></Pressable> )
+             })}
+          </View>
+          
+          <Text style={[s.sectionTitle, {marginTop: 15}]}>લોગિન માટેની વિગતો</Text>
           <TextInput style={s.input} value={loginEmail} onChangeText={setLoginEmail} placeholder="યુઝર ID (દા.ત. Rasodu1)" autoCapitalize="none" />
-          <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder={editingId ? "નવો પાસવર્ડ" : "લોગિન પાસવર્ડ"} />
-          <Pressable disabled={saving} onPress={saveUser} style={[s.primary]}><Text style={s.primaryText}>{saving ? 'સેવ થઈ રહ્યું છે...' : 'સેવ કરો'}</Text></Pressable>
-          <Pressable onPress={() => setShowForm(false)} style={s.closeButton}><Text>કેન્સલ</Text></Pressable>
+          <TextInput style={s.input} value={loginPass} onChangeText={setLoginPass} placeholder={editingId ? "નવો પાસવર્ડ (બદલવો હોય તો જ લખો)" : "લોગિન પાસવર્ડ"} onSubmitEditing={saveUser} returnKeyType="done" />
+
+          <Pressable disabled={saving} onPress={saveUser} style={[s.primary, saving && {opacity: 0.7}]}><Text style={s.primaryText}>{saving ? 'સેવ થઈ રહ્યું છે...' : 'યુઝર સેવ કરો (Enter)'}</Text></Pressable>
+          <Pressable disabled={saving} onPress={() => {setShowForm(false); setEditingId(null);}} style={[s.closeButton, {marginTop: 5}]}><Text style={s.closeText}>કેન્સલ</Text></Pressable>
         </View>
-      ) : ( <Pressable onPress={() => {setEditingId(null); setName(''); setLoginEmail(''); setLoginPass(''); setSelectedDutyPlaces([]); setShowForm(true);}} style={[s.primary, {backgroundColor: '#4f46e5'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable> )}
-      {users.map(u => <View key={u.id} style={s.listCard}><Text style={{fontWeight:'bold', fontSize:16}}>{u.full_name}</Text></View>)}
+      ) : (
+        <Pressable onPress={() => {setEditingId(null); setName(''); setMobile(''); setLoginEmail(''); setLoginPass(''); setSelectedDutyPlaces([]); setShowForm(true);}} style={[s.primary, {backgroundColor: '#4f46e5'}]}><Text style={s.primaryText}>＋ નવો યુઝર બનાવો</Text></Pressable>
+      )}
+
+      <Text style={[s.sectionTitle, {marginTop: 20}]}>સ્ટાફ લિસ્ટ</Text>
+      {users.map(u => {
+          const placeNames = (u.duty_places || []).map((id:string) => places.find(p=>p.id===id)?.name || 'Unknown').join(', ');
+          return (
+            <View key={u.id} style={s.listCard}>
+              <View style={{flex: 1}}>
+                <Text style={{fontWeight:'bold', fontSize:16, color: '#1e293b'}}>{u.full_name || 'No Name'}</Text>
+                <Text style={{color:'#64748b', fontSize: 13, marginTop: 4}}>ID: <Text style={{fontWeight: 'bold', color: '#1e293b'}}>{u.login_email}</Text> • {roleLabel[u.role as Role]}</Text>
+                {placeNames ? <Text style={{color:'#0369a1', fontSize: 12, fontWeight: 'bold', marginTop: 4}}>📍 {placeNames}</Text> : null}
+              </View>
+              <View style={{alignItems: 'flex-end', gap: 6}}>
+                <View style={[s.statusBadge, {backgroundColor: u.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: u.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{u.is_active ? 'Active' : 'Inactive'}</Text></View>
+                <View style={{flexDirection: 'row', gap: 5}}>
+                  <Pressable onPress={() => openEdit(u)} style={s.editBtn}><Text style={s.editBtnText}>✏️ એડિટ</Text></Pressable>
+                  <Pressable onPress={() => deleteUser(u.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
+                </View>
+              </View>
+            </View>
+          );
+      })}
     </View>
   );
 }
 
-// ================= COUNTER & PRODUCTION (WITH NEW SORTING) =================
+// ================= COUNTER & PRODUCTION =================
 function CounterHome({ session, profile }: { session: Session, profile: Profile }) {
   const [activeTab, setActiveTab] = useState<'home'|'new_booking'>('home');
   const [todayData, setTodayData] = useState({ total: 0, mealMap: {} as any });
@@ -724,6 +921,5 @@ const s = StyleSheet.create({
   mainTypeHeader: { fontSize: 20, fontWeight: '900', color: '#047857', borderBottomWidth: 2, borderBottomColor: '#047857', paddingBottom: 6, marginBottom: 12, marginTop: 10 }, collapsibleHeader: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }, collapsibleHeaderText: { fontSize: 16, fontWeight: 'bold', color: '#1e3a8a' }, collapsibleHeaderIcon: { fontSize: 14, color: '#1e3a8a', fontWeight: 'bold' }, chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 4, marginBottom: 15 }, chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 25, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }, chipSelected: { backgroundColor: '#047857', borderColor: '#047857' }, chipText: { fontSize: 14, color: '#475569', fontWeight: '600' }, chipTextSelected: { color: '#ffffff' },
   // ડ્રેગ એન્ડ ડ્રોપ સ્ટાઈલ
   dragItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee', cursor: 'grab' },
-  dragHandle: { fontSize: 20, color: '#94a3b8', marginRight: 15, fontWeight: 'bold' },
-  dragging: { backgroundColor: '#f1f5f9', opacity: 0.8, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8 }
+  dragHandle: { fontSize: 24, color: '#94a3b8', marginRight: 15, fontWeight: 'bold', cursor: 'grab' }
 });
