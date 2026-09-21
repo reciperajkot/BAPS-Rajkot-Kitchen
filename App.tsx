@@ -1208,8 +1208,7 @@ const s = StyleSheet.create({
   todayGuestsCard: { borderRadius: 16, padding: 18, borderWidth: 1.5, marginVertical: 10 }, mealPill: { backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#a7f3d0', alignSelf: 'flex-start' },
   input:{backgroundColor:'#ffffff',borderWidth:1,borderColor:'#cbd5e1',borderRadius:10,padding:14,marginBottom:14,fontSize:16, color: '#1e293b'}, label:{fontWeight:'700',marginBottom:6, marginTop:4, color: '#334155', fontSize: 14}, 
   primary:{backgroundColor:'#047857',padding:16,borderRadius:12,alignItems:'center',marginVertical:6}, primaryText:{color:'#fff',fontSize:16,fontWeight:'800'}, 
-  backButton:{alignSelf:'flex-start',paddingVertical:6,paddingHorizontal:2,marginBottom:10}, backText:{fontSize:15,fontWeight:'700',color:'#047857'}, 
-  formCard:{backgroundColor:'#ffffff',borderRadius:16,padding:20,marginTop:12,borderWidth:1,borderColor:'#e2e8f0'}, sectionTitle:{fontSize:18,fontWeight:'900',marginBottom:14, color: '#1e293b'}, 
+backButton: { alignSelf: 'flex-start', paddingVertical: 12, paddingHorizontal: 20, marginBottom: 18, backgroundColor: '#f1f5f9', borderRadius: 30, borderWidth: 1.5, borderColor: '#cbd5e1' }, backText: { fontSize: 16, fontWeight: '900', color: '#0f172a' },  formCard:{backgroundColor:'#ffffff',borderRadius:16,padding:20,marginTop:12,borderWidth:1,borderColor:'#e2e8f0'}, sectionTitle:{fontSize:18,fontWeight:'900',marginBottom:14, color: '#1e293b'}, 
   menuBtn: { backgroundColor: '#ffffff', padding: 18, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }, menuBtnText: { color: '#1e293b', fontSize: 16, fontWeight: 'bold' }, 
   listCard: { flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:16, backgroundColor:'#ffffff', marginBottom:10, borderRadius:12, borderWidth:1, borderColor:'#e2e8f0' }, 
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }, editBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }, editBtnText: { fontWeight: 'bold', color: '#475569', fontSize: 13 }, 
@@ -1227,4 +1226,3 @@ const s = StyleSheet.create({
   dragItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' },
   dragHandle: { fontSize: 20, color: '#94a3b8', marginRight: 15, fontWeight: 'bold' },
   dragging: { backgroundColor: '#dbeafe', borderWidth: 1, borderColor: '#93c5fd', borderRadius: 8 }
-});
