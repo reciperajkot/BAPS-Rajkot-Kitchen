@@ -19,7 +19,6 @@ const BASE_SUB_TYPES = ['મિષ્ટાન્ન', 'ફરસાણ', 'ર�
 
 function getTodayStr() { const d = new Date(); return `${d.getDate().toString().padStart(2, '0')}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getFullYear()}`; }
 function getTomorrowStr() { const d = new Date(); d.setDate(d.getDate() + 1); return `${d.getDate().toString().padStart(2, '0')}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getFullYear()}`; }
-function parseTimeForSort(timeStr: string) { if (!timeStr) return 0; const [time, modifier] = timeStr.split(' '); if (!time || !modifier) return 0; let [h, m] = time.split(':'); let hr = parseInt(h, 10); if (hr === 12) hr = 0; if (modifier === 'PM') hr += 12; return (hr * 60) + parseInt(m, 10); }
 
 const showMsg = (title: string, msg: string) => { if (Platform.OS === 'web') window.alert(title + " \n\n" + msg); else Alert.alert(title, msg); };
 
@@ -155,7 +154,7 @@ function AdminHome({ session, profile }: { session: Session, profile: Profile })
           if (b.meals) {
             b.meals.forEach((m: any) => {
               const g = m.guestsCount || 0; 
-              const hostName = `${b.name || ''} ${b.middle_name || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ') || 'અજ્ઞાત યજમાન';
+              const hostName = `${b.name || ''} ${b.father || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ') || 'અજ્ઞાત યજમાન';
               const mealLabel = m.mealCategory === 'ફરાળી' ? '(ફરાળી)' : '';
               
               if (m.date === tStr) {
@@ -300,7 +299,6 @@ function TodayReportScreen({ onBack }: { onBack: () => void }) {
                 const gCount = m.guestsCount || 0;
                 tGuests += gCount; tRevenue += (m.ratePerPlate * gCount);
                 
-                // ફરાળી માટે રસોડાના રિપોર્ટમાં અલગ કેટેગરી બનાવીશું
                 const mType = m.mealCategory === 'ફરાળી' ? `${m.mainType} (ફરાળી)` : m.mainType;
                 
                 if (!mBreakdown[mType]) mBreakdown[mType] = 0;
@@ -733,7 +731,7 @@ function CounterHome({ session, profile }: { session: Session, profile: Profile 
           if (b.meals) {
             b.meals.forEach((m: any) => {
               const g = m.guestsCount || 0; totalAllGuests += g;
-              const hostName = `${b.name || ''} ${b.middle_name || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ') || 'અજ્ઞાત યજમાન';
+              const hostName = `${b.name || ''} ${b.father || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ') || 'અજ્ઞાત યજમાન';
               const mealLabel = m.mealCategory === 'ફરાળી' ? '(ફરાળી)' : '';
 
               if (m.date === tStr) { tData.total += g; if(!tData.mealMap[m.mainType]) tData.mealMap[m.mainType] = { count: 0, hosts: [] }; tData.mealMap[m.mainType].count += g; tData.mealMap[m.mainType].hosts.push(`${hostName} ${mealLabel} - (${g})`); }
@@ -832,7 +830,6 @@ function ProductionHome() {
               if (m.date === targetDateStr) {
                 const gCount = m.guestsCount || 0; tGuests += gCount;
                 
-                // રસોડામાં ફરાળી વાનગીઓનું લિસ્ટ અલગ દેખાય તે માટેનું લોજિક
                 const mType = m.mealCategory === 'ફરાળી' ? `${m.mainType} (ફરાળી)` : m.mainType;
                 
                 if (!agg[pName][mType]) agg[pName][mType] = {};
@@ -900,7 +897,7 @@ function ProductionHome() {
 // ================= BOOKING COMPONENTS =================
 function BookingCard({ b, places, isAdmin, onEdit, fetchBookings }: any) {
   const placeName = places.find((p:any) => p.id === b.place_id)?.name || 'સ્થળ નથી';
-  const fullName = `${b.name || ''} ${b.middle_name || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ');
+  const fullName = `${b.name || ''} ${b.father || ''} ${b.surname || ''}`.trim().replace(/\s+/g, ' ');
 
   async function handleDelete() {
     if(Platform.OS==='web') { if(window.confirm('ખરેખર આ બુકિંગ કાઢી નાખવું છે?')){ await supabase!.from('bookings').delete().eq('id', b.id); if(fetchBookings) fetchBookings(); } }
@@ -940,6 +937,7 @@ function BookingCard({ b, places, isAdmin, onEdit, fetchBookings }: any) {
           <Text style={{fontWeight: 'bold', color: '#1e3a8a', fontSize: 14}}>🗓️ {m.date} • ⏰ {m.time}</Text>
           <Text style={{fontWeight: '700', marginTop: 4, color: '#334155'}}>📍 {placeName} • {m.mainType} <Text style={{color:'#ea580c'}}>{m.mealCategory === 'ફરાળી' ? '(ફરાળી)' : ''}</Text> ({m.guestsCount} લોકો)</Text>
           <Text style={{color: '#64748b', fontSize: 13, marginTop: 2}}>🍽️ {m.items?.map((i:any)=> i.name ? i.name : i).join(', ')}</Text>
+          {m.specialNote ? <Text style={{color: '#dc2626', fontSize: 13, marginTop: 4, fontWeight: 'bold'}}>📝 નોંધ: {m.specialNote}</Text> : null}
         </View>
       ))}
       <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12}}>
@@ -961,9 +959,8 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
   const [menuItems, setMenuItems] = useState<any[]>([]); 
   const [saving, setSaving] = useState(false);
   
-  // 1. નવા ૩ ફીલ્ડ્સ નો ઉમેરો
   const [name, setName] = useState(initialData?.name || ''); 
-  const [middleName, setMiddleName] = useState(initialData?.middle_name || ''); 
+  const [father, setFather] = useState(initialData?.father || ''); 
   const [surname, setSurname] = useState(initialData?.surname || ''); 
   
   const [mobile, setMobile] = useState(initialData?.mobile || '');
@@ -976,7 +973,6 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
   const [showMealBuilder, setShowMealBuilder] = useState(false); 
   const [editingMealIndex, setEditingMealIndex] = useState<number | null>(null);
   
-  // 3. ઠાકોરજી સેવા માટે ફ્રી ટેક્સ્ટ ઇનપુટ સ્ટેટ
   const [thakorjiSeva, setThakorjiSeva] = useState(initialData?.thakorji_seva?.toString() || ''); 
   const [receiptNo, setReceiptNo] = useState(initialData?.receipt_no || '');
   const [paymentStatus, setPaymentStatus] = useState(initialData?.payment_status || 'પૂર્ણ સેવા'); 
@@ -1001,8 +997,7 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
     if (!selectedPlaceId) return showMsg('ભૂલ', 'બુકિંગ માટે સ્થળ પસંદ કરવું ફરજિયાત છે.');
     if (!supabase) return; setSaving(true);
     try {
-      // ડેટાબેઝ સેવ પેલોડ
-      const payload = { name: name.trim(), middle_name: middleName.trim(), surname: surname.trim(), mobile, place_id: selectedPlaceId, meals, thakorji_seva: (parseInt(thakorjiSeva) || 0), receipt_no: receiptNo, payment_status: paymentStatus, grand_total: grandTotal, user_id: session.user.id };
+      const payload = { name: name.trim(), father: father.trim(), surname: surname.trim(), mobile, place_id: selectedPlaceId, meals, thakorji_seva: (parseInt(thakorjiSeva) || 0), receipt_no: receiptNo, payment_status: paymentStatus, grand_total: grandTotal, user_id: session.user.id };
       const res = initialData?.id ? await supabase.from('bookings').update(payload).eq('id', initialData.id) : await supabase.from('bookings').insert([payload]);
       if (res.error) throw res.error;
       showMsg('સફળતા 🎉', `બુકિંગ સેવ થઈ ગયું!`); onBack();
@@ -1017,7 +1012,7 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
       <View style={s.formCard}>
         <Text style={s.sectionTitle}>1. યજમાનની વિગતો</Text>
         <TextInput placeholder="નામ" style={s.input} value={name} onChangeText={setName} />
-        <TextInput placeholder="પિતા/પતિ નું નામ" style={s.input} value={middleName} onChangeText={setMiddleName} />
+        <TextInput placeholder="પિતા/પતિ નું નામ" style={s.input} value={father} onChangeText={setFather} />
         <TextInput placeholder="અટક" style={s.input} value={surname} onChangeText={setSurname} />
 
         <TextInput placeholder="મોબાઇલ નંબર (૧૦ આંકડા)" style={[s.input, {marginTop: 10}]} keyboardType="phone-pad" maxLength={10} value={mobile} onChangeText={setMobile} />
@@ -1029,6 +1024,8 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
           <View key={index} style={[s.mealBox, meal.mealCategory === 'ફરાળી' && {backgroundColor: '#fff7ed', borderColor: '#fdba74'}]}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{fontWeight:'bold', color:'#1e3a8a'}}>🗓️ {meal.date} • ⏰ {meal.time}</Text><Text>({meal.guestsCount} લોકો)</Text></View>
             <Text style={{fontWeight:'bold', marginTop: 5, color: meal.mealCategory === 'ફરાળી' ? '#ea580c' : '#1e293b'}}>{meal.mainType} {meal.mealCategory === 'ફરાળી' ? '(ફરાળી)' : ''}</Text>
+            <Text style={{color: '#64748b', fontSize: 13, marginTop: 4}}>🍽️ {meal.items?.map((i:any)=> i.name ? i.name : i).join(', ')}</Text>
+            {meal.specialNote ? <Text style={{color: '#dc2626', fontSize: 13, marginTop: 4, fontWeight: 'bold'}}>📝 નોંધ: {meal.specialNote}</Text> : null}
             <View style={{flexDirection: 'row', gap: 10, marginTop: 12}}>
               <Pressable onPress={() => { setEditingMealIndex(index); setShowMealBuilder(true); }} style={[s.editBtn, {flex: 1, alignItems: 'center'}]}><Text>✏️ એડિટ</Text></Pressable>
               <Pressable onPress={() => setMeals(meals.filter((_, i) => i !== index))} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color: '#dc2626'}}>🗑️</Text></Pressable>
@@ -1037,17 +1034,14 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
         ))}
         <Pressable onPress={() => { setEditingMealIndex(null); setShowMealBuilder(true); }} style={[s.primary, {backgroundColor:'#ffffff', borderWidth: 2, borderColor:'#047857', borderStyle:'dashed'}]}><Text style={{color:'#047857', fontWeight:'bold'}}>＋ નવો જમણવાર ઉમેરો</Text></Pressable>
 
-        {/* 2. સેવા સેક્શન નામકરણ */}
         <Text style={[s.sectionTitle, {marginTop: 20}]}>3. સેવા</Text>
         
-        {/* 3. ઠાકોરજી સેવા ઇનપુટ */}
         <Text style={s.label}>ઠાકોરજી સેવા (₹)</Text>
         <TextInput placeholder="કોઈ સેવા રકમ લખો દા.ત. 5100" style={s.input} keyboardType="numeric" value={thakorjiSeva} onChangeText={setThakorjiSeva} />
         
         <Text style={s.label}>રસીદ / પહોંચ નંબર</Text>
         <TextInput placeholder="પહોંચ નંબર" style={s.input} value={receiptNo} onChangeText={setReceiptNo} />
         
-        {/* 4. સેવા સ્ટેટસ સિંગલ સિલેક્ટ બટન્સ */}
         <Text style={s.label}>સેવા સ્ટેટસ (Payment Status)</Text>
         <View style={{flexDirection: 'row', gap: 10, marginBottom: 14}}>
            <Pressable onPress={() => setPaymentStatus('પૂર્ણ સેવા')} style={[s.chip, paymentStatus === 'પૂર્ણ સેવા' && s.chipSelected, {flex: 1, alignItems: 'center', paddingVertical: 14}]}><Text style={[s.chipText, paymentStatus === 'પૂર્ણ સેવા' && s.chipTextSelected, {fontSize: 16}]}>પૂર્ણ સેવા</Text></Pressable>
@@ -1065,17 +1059,17 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
   );
 }
 
-// 5. રેગ્યુલર અને ફરાળી સાથેનું નવું MealBuilder
 function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: any) {
   const [date, setDate] = useState(''); const [time, setTime] = useState(''); const [guestsCount, setGuestsCount] = useState(''); 
   const [mainType, setMainType] = useState('લંચ'); const [selectedItems, setSelectedItems] = useState<any>({});
   const [calculatedTotal, setCalculatedTotal] = useState<number | null>(null);
   const [mealCategory, setMealCategory] = useState('રેગ્યુલર');
+  const [specialNote, setSpecialNote] = useState('');
 
   useEffect(() => {
     if (visible) {
-      if (initialData) { setDate(initialData.date); setTime(initialData.time); setGuestsCount(initialData.guestsCount.toString()); setMainType(initialData.mainType); setCalculatedTotal(initialData.ratePerPlate); setMealCategory(initialData.mealCategory || 'રેગ્યુલર'); const m: any = {}; initialData.items.forEach((i:any) => m[i.id || i] = true); setSelectedItems(m); } 
-      else { setDate(''); setTime(''); setGuestsCount(''); setMainType('લંચ'); setMealCategory('રેગ્યુલર'); setSelectedItems({}); setCalculatedTotal(null); }
+      if (initialData) { setDate(initialData.date); setTime(initialData.time); setGuestsCount(initialData.guestsCount.toString()); setMainType(initialData.mainType); setMealCategory(initialData.mealCategory || 'રેગ્યુલર'); setSpecialNote(initialData.specialNote || ''); setCalculatedTotal(initialData.ratePerPlate); const m: any = {}; initialData.items.forEach((i:any) => m[i.id || i] = true); setSelectedItems(m); } 
+      else { setDate(''); setTime(''); setGuestsCount(''); setMainType('લંચ'); setMealCategory('રેગ્યુલર'); setSpecialNote(''); setSelectedItems({}); setCalculatedTotal(null); }
     }
   }, [visible, initialData]);
 
@@ -1092,7 +1086,7 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
   function handleSave() {
     if (!date || !time || !guestsCount) return showMsg('Error', 'તારીખ, સમય અને લોકોની સંખ્યા લખવી જરૂરી છે');
     if (calculatedTotal === null) return showMsg('Error', 'પહેલા મેનૂની સેવા ગણો');
-    onSave({ date, time, guestsCount: parseInt(guestsCount) || 0, mainType, mealCategory, items: menuItems.filter((m:any) => selectedItems[m.id]), ratePerPlate: calculatedTotal });
+    onSave({ date, time, guestsCount: parseInt(guestsCount) || 0, mainType, mealCategory, specialNote, items: menuItems.filter((m:any) => selectedItems[m.id]), ratePerPlate: calculatedTotal });
   }
 
   return (
@@ -1124,6 +1118,10 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
                  ))}</View>
                </View>
             ))}
+
+            <Text style={[s.sectionTitle, {marginTop: 20}]}>ખાસ નોંધ (Special Note)</Text>
+            <TextInput placeholder="કોઈ ખાસ નોંધ હોય તો અહીં લખો..." style={[s.input, {minHeight: 80, textAlignVertical: 'top'}]} multiline value={specialNote} onChangeText={setSpecialNote} />
+
             <Pressable onPress={()=> { let total = 0; menuItems.forEach((item:any) => { if (selectedItems[item.id]) total += item.price; }); setCalculatedTotal(total); }} style={[s.primary, {backgroundColor:'#0284c7', marginTop: 20}]}><Text style={s.primaryText}>સેવા રાશી ગણો</Text></Pressable>
             {calculatedTotal !== null && <View style={s.autoRateBox}><Text style={s.autoRateLabel}>૧ ડિશની ફિક્સ સેવા:</Text><Text style={s.autoRateValue}>₹ {calculatedTotal}</Text></View>}
             <Pressable onPress={handleSave} style={[s.saveBtn, {marginTop: 20}]}><Text style={s.saveBtnText}>{initialData ? 'ફેરફાર સેવ કરો' : 'આ જમણવાર સેવ કરો'}</Text></Pressable>
