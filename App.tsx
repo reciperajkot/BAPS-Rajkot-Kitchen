@@ -1226,3 +1226,4 @@ backButton: { alignSelf: 'flex-start', paddingVertical: 12, paddingHorizontal: 2
   dragItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' },
   dragHandle: { fontSize: 20, color: '#94a3b8', marginRight: 15, fontWeight: 'bold' },
   dragging: { backgroundColor: '#dbeafe', borderWidth: 1, borderColor: '#93c5fd', borderRadius: 8 }
+});
