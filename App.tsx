@@ -1103,7 +1103,14 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData }: 
 
   if (!visible) return null;
   const filteredMenu = menuItems.filter((m:any) => m.is_active && m.main_type === mainType);
-  const availableSubs = Array.from(new Set(menuItems.filter((m:any)=>m.main_type === mainType).sort((a:any,b:any)=>(a.sub_sort||99)-(b.sub_sort||99)).map((m:any)=>m.sub_category).filter(Boolean)));
+  
+  // અહી કેટેગરીને (મિષ્ટાન્ન વગેરે) એડમિન પેનલના ક્રમ મુજબ પરફેક્ટ સોર્ટ કરવાનું લોજિક છે:
+  const availableSubs = Array.from(new Set(filteredMenu.map((m:any)=>m.sub_category).filter(Boolean)));
+  availableSubs.sort((a: any, b: any) => {
+    const valA = filteredMenu.find((m:any) => m.sub_category === a)?.sub_sort ?? 99;
+    const valB = filteredMenu.find((m:any) => m.sub_category === b)?.sub_sort ?? 99;
+    return valA - valB;
+  });
 
   function handleSave() {
     if (!date || !time || !guestsCount) return showMsg('Error', 'તારીખ, સમય અને લોકોની સંખ્યા લખવી જરૂરી છે');
