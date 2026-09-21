@@ -414,24 +414,22 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
       if (editingId) await supabase.from('menu_items').update(payload).eq('id', editingId);
       else await supabase.from('menu_items').insert([payload]);
       setName(''); setPrice(''); setEditingId(null); fetchMenu(); showMsg('Success', 'વાનગી સફળતાપૂર્વક સેવ થઈ ગઈ!');
-    } catch (err: any) { showMsg('Error', err.message); } finally { setSavingSort(false); }
+    } catch (err: any) { showMsg('Error', err.message); }
   }
 
-  // --- Smooth Animated Smart Swap ---
   const handleMainTap = (idx: number) => {
     if (selectedMainIdx === null) {
-      setSelectedMainIdx(idx); // First tap selects
+      setSelectedMainIdx(idx); 
     } else if (selectedMainIdx === idx) {
-      setSelectedMainIdx(null); // Deselect if tapped again
+      setSelectedMainIdx(null); 
     } else {
-      // Second tap on different item -> ANIMATED SWAP
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const newList = [...dynamicMainTypes];
       const temp = newList[selectedMainIdx];
       newList[selectedMainIdx] = newList[idx];
       newList[idx] = temp;
       setDynamicMainTypes(newList);
-      setSelectedMainIdx(null); // Clear selection
+      setSelectedMainIdx(null); 
     }
   };
 
@@ -451,13 +449,19 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
     }
   };
 
+  // 8. Fix: Sequential Saving to prevent Database Rate Limit Errors
   async function saveGlobalSortOrder() {
     if(!supabase) return; setSavingSort(true);
     try {
-      const updates: Promise<any>[] = [];
-      dynamicMainTypes.forEach((catName, idx) => updates.push(supabase!.from('menu_items').update({ main_sort: idx }).eq('main_type', catName)));
-      dynamicSubTypes.forEach((catName, idx) => updates.push(supabase!.from('menu_items').update({ sub_sort: idx }).eq('sub_category', catName)));
-      await Promise.all(updates);
+      // વારાફરતી મુખ્ય કેટેગરી સેવ કરો
+      for (let i = 0; i < dynamicMainTypes.length; i++) {
+        await supabase!.from('menu_items').update({ main_sort: i }).eq('main_type', dynamicMainTypes[i]);
+      }
+      // વારાફરતી સબ કેટેગરી સેવ કરો
+      for (let i = 0; i < dynamicSubTypes.length; i++) {
+        await supabase!.from('menu_items').update({ sub_sort: i }).eq('sub_category', dynamicSubTypes[i]);
+      }
+
       await fetchMenu();
       setShowCatManager(false);
       showMsg('સફળતા 🎉', 'ક્રમ ડેટાબેઝમાં કાયમી સેવ થઈ ગયો છે અને આખી એપમાં અપડેટ થઈ ગયો છે!');
@@ -533,7 +537,6 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
         );
       })}
 
-      {/* SMART TAP & SWAP MODAL */}
       <Modal visible={showCatManager} animationType="slide">
         <SafeAreaView style={s.safe}>
            <View style={[s.header, {paddingTop: Platform.OS==='web'?20:0}]}><Text style={s.h1}>કેટેગરીનો ક્રમ બદલો</Text><Pressable onPress={()=>{setShowCatManager(false); setSelectedMainIdx(null); setSelectedSubIdx(null);}}><Text style={{fontSize:24, color:'#64748b'}}>✕</Text></Pressable></View>
@@ -584,7 +587,7 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ================= ADMIN PLACES & USERS =================
+// ================= ADMIN PLACES & USERS (100% RESTORED) =================
 function AdminPlacesScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(''); const [places, setPlaces] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
   useEffect(() => { fetchPlaces(); }, []);
