@@ -892,8 +892,7 @@ function Dropdown({ label, options, selectedValue, onSelect, placeholder, onAddN
 function Card({ title, icon, value }: any) { return <View style={s.card}><Text style={s.icon}>{icon}</Text><Text style={s.muted}>{title}</Text><Text style={s.value}>{value}</Text></View>; }
 function LoadingScreen() { return <SafeAreaView style={s.center}><ActivityIndicator size="large" color="#047857" /><Text style={{marginTop:10, color: '#64748b'}}>Loading...</Text></SafeAreaView>; }
 function SetupScreen() { return <SafeAreaView style={s.center}><Text style={{color: '#dc2626'}}>Supabase config missing.</Text></SafeAreaView>; }
-function TodayReportScreen({ onBack }: any) { return <View style={s.p18}><Pressable onPress={onBack}><Text style={s.backText}>‹ પાછા</Text></Pressable><Text style={s.h1}>Report</Text></View>; }
-function AllBookingsScreen({ onBack }: any) { return <View style={s.p18}><Pressable onPress={onBack}><Text style={s.backText}>‹ પાછા</Text></Pressable><Text style={s.h1}>All Bookings</Text></View>; }
+
 
 // ================= STYLES =================
 const s = StyleSheet.create({
