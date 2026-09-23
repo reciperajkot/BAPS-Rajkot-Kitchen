@@ -485,7 +485,7 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
         <Text style={s.h1}>મેનૂ મેનેજમેન્ટ</Text>
         <Pressable onPress={()=>setShowCatManager(true)} style={[s.refreshBtn, {backgroundColor: '#1e293b'}]}><Text style={[s.refreshBtnText, {color: '#fff'}]}>⚙️ કેટેગરીનો ક્રમ બદલો (Sort)</Text></Pressable>
       </View>
-      <View style={s.formCard}>
+     <View style={s.formCard} nativeID="edit-form-card">
         <Text style={s.sectionTitle}>{editingId ? 'વાનગી એડિટ કરો' : 'નવી વાનગી ઉમેરો'}</Text>
         <TextInput style={s.input} value={name} onChangeText={setName} placeholder="વાનગીનું નામ (દા.ત. રોટલી)" />
         <Dropdown label="કયા જમણવારમાં ઉમેરવી છે?" options={dynamicMainTypes.map(t => ({label: t, value: t}))} selectedValue={mainType} onSelect={setMainType} />
@@ -522,7 +522,23 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
                           <View style={{alignItems: 'flex-end', gap: 6}}>
                              <View style={[s.statusBadge, {backgroundColor: m.is_active ? '#f0fdf4' : '#fef2f2'}]}><Text style={{color: m.is_active ? '#047857' : '#dc2626', fontWeight:'bold', fontSize: 12}}>{m.is_active ? 'Active' : 'Inactive'}</Text></View>
                              <View style={{flexDirection:'row', gap: 5}}>
-                              <Pressable onPress={() => {setEditingId(m.id); setName(m.name); setMainType(m.main_type); setSubCategory(m.sub_category||''); setPrice(m.price.toString()); setExpandedSubs({[`${m.main_type}_${m.sub_category}`]: true});}} style={s.editBtn}><Text>✏️</Text></Pressable>
+                             <Pressable onPress={() => {
+  setEditingId(m.id); 
+  setName(m.name); 
+  setMainType(m.main_type); 
+  setSubCategory(m.sub_category||''); 
+  setPrice(m.price.toString()); 
+  setExpandedSubs({[`${m.main_type}_${m.sub_category}`]: true});
+  
+  // નવું ઓટો-સ્ક્રોલ ફીચર
+  if (Platform.OS === 'web') {
+    setTimeout(() => {
+      document.getElementById('edit-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+}} style={s.editBtn}>
+  <Text>✏️</Text>
+</Pressable>
                               <Pressable onPress={() => toggleStatus(m.id, m.is_active)} style={s.editBtn}><Text style={s.editBtnText}>{m.is_active ? 'બંધ' : 'ચાલુ'}</Text></Pressable>
                               <Pressable onPress={() => deleteMenu(m.id)} style={[s.editBtn, {backgroundColor: '#fef2f2', borderColor: '#fca5a5'}]}><Text style={{color:'#dc2626'}}>🗑️</Text></Pressable>
                             </View>
