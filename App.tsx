@@ -400,17 +400,39 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
     }
   }
 
-  async function saveMenu() {
+ async function saveMenu() {
     if (!name.trim() || !price || !supabase) return showMsg('Error', 'વાનગીનું નામ અને સેવા રાશી લખો.');
-    const mainSortVal = dynamicMainTypes.indexOf(mainType); const subSortVal = dynamicSubTypes.indexOf(subCategory);
+    
+    // કેટેગરીનો ક્રમ સેટ કરવા માટે
+    const mainSortVal = dynamicMainTypes.indexOf(mainType); 
+    const subSortVal = dynamicSubTypes.indexOf(subCategory);
     const finalMSort = mainSortVal > -1 ? mainSortVal : dynamicMainTypes.length;
     const finalSSort = subSortVal > -1 ? subSortVal : dynamicSubTypes.length;
+    
     const payload = { name: name.trim(), main_type: mainType, sub_category: subCategory, price: parseFloat(price) || 0, is_active: true, main_sort: finalMSort, sub_sort: finalSSort };
+    
     try {
-      if (editingId) await supabase.from('menu_items').update(payload).eq('id', editingId);
-      else await supabase.from('menu_items').insert([payload]);
-      setName(''); setPrice(''); setEditingId(null); fetchMenu(); showMsg('Success', 'વાનગી સફળતાપૂર્વક સેવ થઈ ગઈ!');
-    } catch (err: any) { showMsg('Error', err.message); }
+      let res;
+      if (editingId) {
+         res = await supabase.from('menu_items').update(payload).eq('id', editingId);
+      } else {
+         res = await supabase.from('menu_items').insert([payload]);
+      }
+      
+      // 1. કડક એરર ચેકિંગ (Silent Error Fix): જો ડેટાબેઝ એરર આપે તો સીધું Catch માં જશે
+      if (res.error) throw res.error; 
+      
+      // 2. નવી વાનગી એડ થતાં જ તે કેટેગરીનું લિસ્ટ ઓટોમેટિક ઓપન થઈ જશે
+      setExpandedSubs(prev => ({ ...prev, [`${mainType}_${subCategory}`]: true }));
+      
+      setName(''); setPrice(''); setEditingId(null); 
+      
+      await fetchMenu(); // લિસ્ટ રિફ્રેશ થાય ત્યાં સુધી રાહ જુઓ
+      showMsg('Success', 'વાનગી સફળતાપૂર્વક સેવ થઈ ગઈ!');
+      
+    } catch (err: any) { 
+      showMsg('Error', err.message); 
+    }
   }
 
   const handleMainTap = (idx: number) => {
