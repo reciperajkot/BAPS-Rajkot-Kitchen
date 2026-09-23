@@ -409,7 +409,17 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
     const finalMSort = mainSortVal > -1 ? mainSortVal : dynamicMainTypes.length;
     const finalSSort = subSortVal > -1 ? subSortVal : dynamicSubTypes.length;
     
-    const payload = { name: name.trim(), main_type: mainType, sub_category: subCategory, price: parseFloat(price) || 0, is_active: true, main_sort: finalMSort, sub_sort: finalSSort };
+    // અહીં બગ ફિક્સ કર્યો છે: ડેટાબેઝની જરૂરિયાત મુજબ meal_type ઉમેર્યું છે.
+    const payload = { 
+      name: name.trim(), 
+      main_type: mainType, 
+      meal_type: mainType, 
+      sub_category: subCategory, 
+      price: parseFloat(price) || 0, 
+      is_active: true, 
+      main_sort: finalMSort, 
+      sub_sort: finalSSort 
+    };
     
     try {
       let res;
@@ -419,10 +429,10 @@ function AdminMenuScreen({ onBack }: { onBack: () => void }) {
          res = await supabase.from('menu_items').insert([payload]);
       }
       
-      // 1. કડક એરર ચેકિંગ (Silent Error Fix): જો ડેટાબેઝ એરર આપે તો સીધું Catch માં જશે
+      // એરર ચેકિંગ
       if (res.error) throw res.error; 
       
-      // 2. નવી વાનગી એડ થતાં જ તે કેટેગરીનું લિસ્ટ ઓટોમેટિક ઓપન થઈ જશે
+      // નવી વાનગી એડ થતાં જ તે કેટેગરીનું લિસ્ટ ઓટોમેટિક ઓપન થઈ જશે
       setExpandedSubs(prev => ({ ...prev, [`${mainType}_${subCategory}`]: true }));
       
       setName(''); setPrice(''); setEditingId(null); 
