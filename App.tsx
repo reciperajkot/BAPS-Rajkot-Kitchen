@@ -587,11 +587,22 @@ function AdminReceiversScreen({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState(''); const [receivers, setReceivers] = useState<any[]>([]); const [editingId, setEditingId] = useState<string | null>(null);
   useEffect(() => { fetchReceivers(); }, []);
   async function fetchReceivers() { if (!supabase) return; const { data } = await supabase.from('receipt_receivers').select('*').order('created_at', { ascending: true }); if (data) setReceivers(data); }
+  
   async function saveReceiver() {
     if (!name.trim() || !supabase) return showMsg('Error', 'પહોંચ લેનારનું નામ લખો');
-    if (editingId) await supabase.from('receipt_receivers').update({ name: name.trim() }).eq('id', editingId); else await supabase.from('receipt_receivers').insert([{ name: name.trim(), is_active: true }]);
-    setName(''); setEditingId(null); fetchReceivers();
+    try {
+      let res;
+      if (editingId) res = await supabase.from('receipt_receivers').update({ name: name.trim() }).eq('id', editingId); 
+      else res = await supabase.from('receipt_receivers').insert([{ name: name.trim(), is_active: true }]);
+      
+      if (res.error) throw res.error; // આ લાઈન એરર પકડી લેશે
+      
+      setName(''); setEditingId(null); fetchReceivers(); showMsg('સફળતા', 'નામ સેવ થઈ ગયું!');
+    } catch(e:any) {
+      showMsg('Database Error', e.message);
+    }
   }
+  
   async function toggleReceiverStatus(id: string, current: boolean) { await supabase!.from('receipt_receivers').update({ is_active: !current }).eq('id', id); fetchReceivers(); }
 
   return (
@@ -1153,17 +1164,27 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData, ro
 
   function applyRegularMenu() {
     const newSelected = { ...selectedItems };
-    let total = 0;
     menuItems.forEach((m: any) => {
       if (m.main_type === mainType) {
-        if (['દાળ', 'ભાત', 'રોટલી', 'શાક', 'દાળ-ભાત', 'પૂરી'].some(val => m.name.includes(val) || m.sub_category === val)) {
+        const n = m.name.trim();
+        const s = m.sub_category?.trim() || '';
+        
+        // એક્ઝેક્ટ મેચિંગ લોજિક (Exact Matching)
+        if (
+          (s === 'રોટલી' && n === 'રોટલી') ||
+          (s === 'શાક' && n === 'મિક્સ શાક') ||
+          (s === 'કઠોળ' && n === 'કઠોળ') ||
+          (s === 'દાળ' && n === 'ગુજરાતી દાળ') ||
+          (s === 'ભાત' && n === 'ભાત') ||
+          n === 'સલાડ' || n === 'છાશ' || n === 'મુખવાસ' || n === 'રમકડાં' || n === 'પાપડ'
+        ) {
           newSelected[m.id] = true;
         }
       }
-      if (newSelected[m.id]) total += m.price || 0;
     });
     setSelectedItems(newSelected);
-    setCalculatedTotal(total);
+    // એક્સેલ શીટ મુજબ રેગ્યુલર મેનૂનો ડિફોલ્ટ ભાવ ₹180
+    setCalculatedTotal(180); 
   }
 
   return (
@@ -1207,13 +1228,27 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData, ro
             <Text style={[s.sectionTitle, {marginTop: 20}]}>ખાસ નોંધ (Special Note)</Text>
             <TextInput placeholder="કોઈ ખાસ નોંધ હોય તો અહીં લખો..." style={[s.input, {minHeight: 80, textAlignVertical: 'top'}]} multiline value={specialNote} onChangeText={setSpecialNote} />
 
-            {/* Calculate Total - Visible to all for functionality, but text adapts */}
-            <Pressable onPress={()=> { let total = 0; menuItems.forEach((item:any) => { if (selectedItems[item.id]) total += item.price || 0; }); setCalculatedTotal(total); }} style={[s.primary, {backgroundColor:'#0284c7', marginTop: 20}]}><Text style={s.primaryText}>મેનૂ ફાઇનલ કરો / સેવા રાશી ગણો</Text></Pressable>
+            <Pressable onPress={()=> { 
+                let total = 0; menuItems.forEach((item:any) => { if (selectedItems[item.id]) total += item.price || 0; }); 
+                setCalculatedTotal(total > 0 ? total : 180); 
+            }} style={[s.primary, {backgroundColor:'#0284c7', marginTop: 20}]}><Text style={s.primaryText}>મેનૂ ફાઇનલ કરો / સેવા રાશી ગણો</Text></Pressable>
             
             {calculatedTotal !== null && (
                <View style={s.autoRateBox}>
                   <Text style={s.autoRateLabel}>૧ ડિશની ફિક્સ સેવા:</Text>
-                  <Text style={s.autoRateValue}>{role === 'super_admin' ? `₹ ${calculatedTotal}` : '₹ ***'}</Text>
+                  {role === 'super_admin' ? (
+                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Text style={{fontSize: 20, fontWeight: '900', color: '#047857'}}>₹ </Text>
+                        <TextInput 
+                           style={[s.input, {marginBottom: 0, paddingVertical: 4, paddingHorizontal: 8, minWidth: 80, fontSize: 18, fontWeight: 'bold', color: '#047857', textAlign: 'center'}]} 
+                           keyboardType="numeric" 
+                           value={calculatedTotal.toString()} 
+                           onChangeText={(val) => setCalculatedTotal(parseFloat(val) || 0)} 
+                        />
+                     </View>
+                  ) : (
+                     <Text style={s.autoRateValue}>₹ ***</Text>
+                  )}
                </View>
             )}
             
