@@ -1245,7 +1245,7 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData, ro
     });
   }
 
-  // Smart Exact Auto Selection for "રેગ્યુલર મેનૂ"
+ // Smart Exact Auto Selection for "રેગ્યુલર મેનૂ"
   function applyRegularMenu() {
     const newSelected = { ...selectedItems };
     menuItems.forEach((m: any) => {
@@ -1253,12 +1253,15 @@ function MealBuilderModal({ visible, onClose, onSave, menuItems, initialData, ro
         const n = m.name?.trim() || '';
         const s = m.sub_category?.trim() || '';
         
-        // Exact matching logic according to user's DB
+        // Exact matching logic (Fixed multiple selection bug)
         const isRotli = (s === 'રોટલી' && n === 'રોટલી');
-        const isShak = (s === 'શાક') && (n === 'મીક્ષ શાક' || n === 'મિક્સ શાક' || n.includes('મીક્ષ') || n.includes('મિક્સ') || n.includes('શાક'));
-        const isKathol = (s === 'કઠોળ' && (n === 'કઠોળ' || n.includes('કઠોળ')));
-        const isDal = (s === 'દાળ' && (n === 'ગુજરાતી દાળ' || n.includes('દાળ')));
-        const isBhat = (s === 'ભાત' && (n === 'ભાત' || n.includes('ભાત')));
+        // શાકમાં માત્ર 'મીક્ષ શાક' અથવા 'મિક્સ શાક' જ સિલેક્ટ થશે
+        const isShak = (s === 'શાક') && (n === 'મીક્ષ શાક' || n === 'મિક્સ શાક'); 
+        // કઠોળમાં માત્ર એક્ઝેક્ટ 'કઠોળ' નામની આઇટમ જ સિલેક્ટ થશે
+        const isKathol = (s === 'કઠોળ' && n === 'કઠોળ'); 
+        // ભવિષ્યમાં ડબલ સિલેક્શન ન થાય તે માટે દાળ અને ભાતને પણ Exact Match કરી દીધા છે
+        const isDal = (s === 'દાળ' && n === 'ગુજરાતી દાળ');
+        const isBhat = (s === 'ભાત' && n === 'ભાત');
         const isOther = (n === 'સલાડ' || n === 'છાશ' || n === 'મુખવાસ' || n === 'રમકડાં' || n === 'પાપડ' || s === 'સલાડ' || s === 'છાશ' || s === 'મુખવાસ' || s === 'રમકડાં');
 
         if (isRotli || isShak || isKathol || isDal || isBhat || isOther) {
