@@ -1069,6 +1069,10 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
   const [editingMealIndex, setEditingMealIndex] = useState<number | null>(null);
   
   const [thakorjiSeva, setThakorjiSeva] = useState(initialData?.thakorji_seva?.toString() || ''); 
+  
+  // નવું સ્ટેટ: રસોઈ સેવા માટે
+  const [rasoiSeva, setRasoiSeva] = useState(initialData?.rasoi_seva?.toString() || ''); 
+
   const [receiptNo, setReceiptNo] = useState(initialData?.receipt_no || '');
   const [paymentStatus, setPaymentStatus] = useState(initialData?.payment_status || 'પૂર્ણ સેવા'); 
   const [receiptReceiver, setReceiptReceiver] = useState(initialData?.receipt_receiver || '');
@@ -1093,16 +1097,33 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
     const rate = (m.ratePerPlate && m.ratePerPlate > 0) ? m.ratePerPlate : 180;
     mealsTotal += (rate * (parseInt(m.guestsCount) || 0));
   });
+  
+  // રસોઈ સેવા ફાઇનલ ટોટલ માં નથી ઉમેરી (જેમ તમે કહ્યું હતું)
   const grandTotal = mealsTotal + (parseInt(thakorjiSeva) || 0); 
   const diffTotal = grandTotal - (initialData ? (initialData.grand_total || 0) : 0);
 
   async function handleSaveBooking() {
-    if (!name || !mobile || meals.length === 0) return showMsg('અધૂરી માહિતી', 'નામ, નંબર અને ઓછામાં ઓછો 1 જમણવાર ઉમેરવો જરૂરી છે.');
-    if (!selectedPlaceId) return showMsg('ભૂલ', 'બુકિંગ માટે સ્થળ પસંદ કરવું ફરજિયાત છે.');
+    // બધી જ Validations (ફરજિયાતની શરતો) અહીથી કાઢી નાખી છે.
     if (!supabase) return; setSaving(true);
     try {
-      const payload = { name: name.trim(), father: father.trim(), surname: surname.trim(), mobile, place_id: selectedPlaceId, meals, thakorji_seva: (parseInt(thakorjiSeva) || 0), receipt_no: receiptNo, payment_status: paymentStatus, receipt_receiver: receiptReceiver, grand_total: grandTotal, user_id: session.user.id };
+      const payload = { 
+        name: name.trim(), 
+        father: father.trim(), 
+        surname: surname.trim(), 
+        mobile, 
+        place_id: selectedPlaceId || null, 
+        meals, 
+        thakorji_seva: (parseInt(thakorjiSeva) || 0), 
+        rasoi_seva: (parseInt(rasoiSeva) || 0), // નવું ફિલ્ડ
+        receipt_no: receiptNo, 
+        payment_status: paymentStatus, 
+        receipt_receiver: receiptReceiver, 
+        grand_total: grandTotal, 
+        user_id: session.user.id 
+      };
+      
       const res = initialData?.id ? await supabase.from('bookings').update(payload).eq('id', initialData.id) : await supabase.from('bookings').insert([payload]);
+      
       if (res.error) throw res.error;
       showMsg('સફળતા 🎉', `બુકિંગ સેવ થઈ ગયું!`); onBack();
     } catch (err: any) { showMsg('Error', err.message); } finally { setSaving(false); }
@@ -1149,6 +1170,10 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
         
         <Text style={s.label}>ઠાકોરજી સેવા (₹)</Text>
         <TextInput placeholder="કોઈ સેવા રકમ લખો દા.ત. 5100" style={s.input} keyboardType="numeric" value={thakorjiSeva} onChangeText={setThakorjiSeva} />
+
+        {/* નવું રસોઈ સેવા બોક્સ */}
+        <Text style={s.label}>રસોઈ સેવા (₹)</Text>
+        <TextInput placeholder="રસોઈ સેવા રકમ લખો (કુલ સેવામાં નહિ ઉમેરાય)" style={s.input} keyboardType="numeric" value={rasoiSeva} onChangeText={setRasoiSeva} />
         
         <Text style={s.label}>રસીદ / પહોંચ નંબર</Text>
         <TextInput placeholder="પહોંચ નંબર" style={s.input} value={receiptNo} onChangeText={setReceiptNo} />
