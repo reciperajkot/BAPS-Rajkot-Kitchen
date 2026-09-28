@@ -1169,7 +1169,7 @@ function BookingScreen({ onBack, session, profile, initialData, allowedPlaces }:
         <Text style={[s.sectionTitle, {marginTop: 20}]}>3. સેવા</Text>
         
         <Text style={s.label}>ઠાકોરજી સેવા (₹)</Text>
-        <TextInput placeholder="કોઈ સેવા રકમ લખો દા.ત. 5100" style={s.input} keyboardType="numeric" value={thakorjiSeva} onChangeText={setThakorjiSeva} />
+        <TextInput placeholder="કોઈ સેવા રકમ લખો" style={s.input} keyboardType="numeric" value={thakorjiSeva} onChangeText={setThakorjiSeva} />
 
         {/* નવું રસોઈ સેવા બોક્સ */}
         <Text style={s.label}>રસોઈ સેવા (₹)</Text>
