@@ -868,21 +868,95 @@ function CounterHome({ session, profile }: { session: Session, profile: Profile 
   );
 }
 
+// ================= ALL BOOKINGS SCREEN (WITH CREATIVE FILTER & SORT) =================
 function AllBookingsScreen({ onBack, session, profile, isAdmin }: { onBack: () => void, session: Session, profile: Profile, isAdmin: boolean }) {
-  const [bookings, setBookings] = useState<any[]>([]); const [places, setPlaces] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]); 
+  const [places, setPlaces] = useState<any[]>([]);
   const [editingBooking, setEditingBooking] = useState<any>(null);
 
+  // Filter & Sort States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc');
+  const [filterTime, setFilterTime] = useState<'all' | 'today' | 'tomorrow' | 'upcoming' | 'past'>('all');
+  const [filterPayment, setFilterPayment] = useState<'all' | 'pending' | 'done'>('all');
+  const [filterPlace, setFilterPlace] = useState<string>('all');
+
   useEffect(() => { fetchBookings(); }, []);
+
   async function fetchBookings() {
     if (!supabase) return;
     try {
       let query = supabase.from('bookings').select('*').order('created_at', { ascending: false });
-      if (profile.role === 'counter' && profile.duty_places && profile.duty_places.length > 0) query = query.or(profile.duty_places.map(p => `place_id.eq.${p}`).join(','));
-      const { data } = await query; const { data: pData } = await supabase.from('places').select('*');
-      if (data) setBookings(data.sort((a,b) => (b.meals?.[0]?.date?.split('-').reverse().join('') || '0').localeCompare(a.meals?.[0]?.date?.split('-').reverse().join('') || '0')));
+      if (profile.role === 'counter' && profile.duty_places && profile.duty_places.length > 0) {
+         query = query.or(profile.duty_places.map(p => `place_id.eq.${p}`).join(','));
+      }
+      const { data } = await query; 
+      const { data: pData } = await supabase.from('places').select('*');
+      if (data) setBookings(data); // We will sort in memory now
       if (pData) setPlaces(pData);
     } catch(err: any) { showMsg('Fetch Error', err.message); }
   }
+
+  // Date Parsing Helper (DD-MM-YYYY to Timestamp)
+  const parseDate = (dStr: string) => {
+    if (!dStr) return 0;
+    const [d, m, y] = dStr.split('-');
+    if (!d || !m || !y) return 0;
+    return new Date(`${y}-${m}-${d}`).getTime();
+  };
+
+  const todayTime = parseDate(getTodayStr());
+
+  // Creative Filter & Sort Logic (In-Memory for blazing fast performance)
+  const processedBookings = React.useMemo(() => {
+    let result = bookings.filter(b => {
+      // 1. Search Query (Name or Mobile)
+      if (searchQuery) {
+        const searchStr = `${b.name || ''} ${b.mobile || ''} ${b.father || ''} ${b.surname || ''}`.toLowerCase();
+        if (!searchStr.includes(searchQuery.toLowerCase().trim())) return false;
+      }
+      // 2. Payment Filter
+      if (filterPayment === 'pending' && b.payment_status !== 'બાકી સેવા') return false;
+      if (filterPayment === 'done' && b.payment_status !== 'પૂર્ણ સેવા') return false;
+      // 3. Place Filter
+      if (filterPlace !== 'all' && b.place_id !== filterPlace) return false;
+      // 4. Timeframe Filter
+      if (filterTime !== 'all') {
+        const mealDateStr = b.meals?.[0]?.date;
+        if (!mealDateStr) return false;
+        
+        if (filterTime === 'today' && mealDateStr !== getTodayStr()) return false;
+        if (filterTime === 'tomorrow' && mealDateStr !== getTomorrowStr()) return false;
+        
+        const mealTime = parseDate(mealDateStr);
+        if (filterTime === 'upcoming' && mealTime < todayTime) return false;
+        if (filterTime === 'past' && mealTime >= todayTime) return false;
+      }
+      return true;
+    });
+
+    // Sort Logic
+    result.sort((a, b) => {
+      const timeA = parseDate(a.meals?.[0]?.date);
+      const timeB = parseDate(b.meals?.[0]?.date);
+      const amtA = a.grand_total || 0;
+      const amtB = b.grand_total || 0;
+
+      if (sortBy === 'date_desc') return timeB - timeA;
+      if (sortBy === 'date_asc') return timeA - timeB;
+      if (sortBy === 'amount_desc') return amtB - amtA;
+      if (sortBy === 'amount_asc') return amtA - amtB;
+      return 0;
+    });
+
+    return result;
+  }, [bookings, searchQuery, sortBy, filterTime, filterPayment, filterPlace]);
+
+  const toggleFilters = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowFilters(!showFilters);
+  };
 
   const allowedPlaces = (profile.role === 'counter') ? places.filter(p=> (profile.duty_places || []).includes(p.id)) : places;
   
@@ -891,10 +965,96 @@ function AllBookingsScreen({ onBack, session, profile, isAdmin }: { onBack: () =
   return (
     <View style={s.p18}>
       <Pressable onPress={onBack} style={s.backButton}><Text style={s.backText}>‹ પાછા ડેશબોર્ડ પર</Text></Pressable>
-      <Text style={s.h1}>બધા બુકિંગ્સ</Text>
-      {bookings.length === 0 ? <Text style={s.muted}>કોઈ બુકિંગ નથી.</Text> : null}
-      {bookings.map(b => <BookingCard key={b.id} b={b} places={places} role={profile.role} onEdit={setEditingBooking} fetchBookings={fetchBookings} />)}
+      
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap', gap: 10}}>
+         <Text style={s.h1}>બધા બુકિંગ્સ ({processedBookings.length})</Text>
+         <Pressable onPress={toggleFilters} style={[s.refreshBtn, {backgroundColor: showFilters ? '#047857' : '#1e293b'}]}>
+            <Text style={[s.refreshBtnText, {color: '#fff'}]}>{showFilters ? '✕ ફિલ્ટર બંધ કરો' : '🎛️ ફિલ્ટર અને સોર્ટ'}</Text>
+         </Pressable>
+      </View>
+
+      <TextInput 
+         style={[s.input, {borderColor: '#047857', borderWidth: 2, backgroundColor: '#f8fafc'}]} 
+         placeholder="🔍 યજમાનનું નામ અથવા મોબાઈલ નંબર શોધો..." 
+         value={searchQuery} 
+         onChangeText={setSearchQuery} 
+      />
+
+      {/* Creative Filter Panel */}
+      {showFilters && (
+        <View style={{backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3}}>
+           
+           <Text style={{fontSize: 15, fontWeight: 'bold', color: '#64748b', marginBottom: 8}}>ગોઠવણી (Sort by):</Text>
+           <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15}}>
+              <FilterChip label="⬇️ નવી તારીખ" active={sortBy === 'date_desc'} onPress={() => setSortBy('date_desc')} />
+              <FilterChip label="⬆️ જૂની તારીખ" active={sortBy === 'date_asc'} onPress={() => setSortBy('date_asc')} />
+              <FilterChip label="💰 વધુ રકમ" active={sortBy === 'amount_desc'} onPress={() => setSortBy('amount_desc')} />
+              <FilterChip label="💰 ઓછી રકમ" active={sortBy === 'amount_asc'} onPress={() => setSortBy('amount_asc')} />
+           </View>
+
+           <Text style={{fontSize: 15, fontWeight: 'bold', color: '#64748b', marginBottom: 8}}>સમયગાળો (Timeframe):</Text>
+           <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15}}>
+              <FilterChip label="બધા" active={filterTime === 'all'} onPress={() => setFilterTime('all')} />
+              <FilterChip label="આજનું" active={filterTime === 'today'} onPress={() => setFilterTime('today')} />
+              <FilterChip label="આવતીકાલ" active={filterTime === 'tomorrow'} onPress={() => setFilterTime('tomorrow')} />
+              <FilterChip label="ભવિષ્યના" active={filterTime === 'upcoming'} onPress={() => setFilterTime('upcoming')} />
+              <FilterChip label="જૂના" active={filterTime === 'past'} onPress={() => setFilterTime('past')} />
+           </View>
+
+           <Text style={{fontSize: 15, fontWeight: 'bold', color: '#64748b', marginBottom: 8}}>પેમેન્ટ સ્ટેટસ:</Text>
+           <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15}}>
+              <FilterChip label="બધા" active={filterPayment === 'all'} onPress={() => setFilterPayment('all')} />
+              <FilterChip label="બાકી સેવા" active={filterPayment === 'pending'} onPress={() => setFilterPayment('pending')} color="#dc2626" />
+              <FilterChip label="પૂર્ણ સેવા" active={filterPayment === 'done'} onPress={() => setFilterPayment('done')} />
+           </View>
+
+           {allowedPlaces.length > 1 && (
+             <>
+               <Text style={{fontSize: 15, fontWeight: 'bold', color: '#64748b', marginBottom: 8}}>સ્થળ (Place):</Text>
+               <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+                  <FilterChip label="બધા સ્થળ" active={filterPlace === 'all'} onPress={() => setFilterPlace('all')} />
+                  {allowedPlaces.map(p => (
+                     <FilterChip key={p.id} label={p.name} active={filterPlace === p.id} onPress={() => setFilterPlace(p.id)} />
+                  ))}
+               </View>
+             </>
+           )}
+           
+           <Pressable onPress={() => {setSortBy('date_desc'); setFilterTime('all'); setFilterPayment('all'); setFilterPlace('all'); setSearchQuery('');}} style={{marginTop: 15, alignSelf: 'flex-end'}}>
+              <Text style={{color: '#d97706', fontWeight: 'bold', textDecorationLine: 'underline'}}>Reset All Filters</Text>
+           </Pressable>
+        </View>
+      )}
+
+      {processedBookings.length === 0 ? (
+         <View style={{alignItems: 'center', marginTop: 40}}>
+            <Text style={{fontSize: 40}}>🔍</Text>
+            <Text style={{...s.muted, marginTop: 10, fontSize: 16}}>કોઈ બુકિંગ મળ્યું નથી.</Text>
+         </View>
+      ) : null}
+
+      {processedBookings.map(b => (
+         <BookingCard key={b.id} b={b} places={places} role={profile.role} onEdit={setEditingBooking} fetchBookings={fetchBookings} />
+      ))}
     </View>
+  );
+}
+
+// Helper UI Component for Filters
+function FilterChip({ label, active, onPress, color = '#047857' }: any) {
+  return (
+    <Pressable 
+      onPress={onPress} 
+      style={{
+        paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1.5,
+        backgroundColor: active ? color : '#ffffff',
+        borderColor: active ? color : '#cbd5e1'
+      }}
+    >
+      <Text style={{fontSize: 14, fontWeight: 'bold', color: active ? '#ffffff' : '#475569'}}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
